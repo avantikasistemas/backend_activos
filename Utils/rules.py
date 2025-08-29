@@ -111,7 +111,7 @@ class Rules:
                 "tipo": "string",
                 "campo": "docto_compra",
                 "valor": params["docto_compra"],
-                "obligatorio": False,
+                "obligatorio": True,
             },
             {
                 "tipo": "string",
@@ -224,7 +224,7 @@ class Rules:
                 "tipo": "string",
                 "campo": "docto_compra",
                 "valor": params["docto_compra"],
-                "obligatorio": False,
+                "obligatorio": True,
             },
             {
                 "tipo": "string",

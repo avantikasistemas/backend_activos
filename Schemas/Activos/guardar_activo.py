@@ -11,7 +11,7 @@ class GuardarActivo(BaseModel):
     vida_util: Optional[int] = None
     proveedor: int = None
     tercero: int = None
-    docto_compra: Optional[str] = None
+    docto_compra: str = None
     fecha_compra: str = None
     caracteristicas: Optional[str] = None
     sede: int = None
