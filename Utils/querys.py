@@ -1,6 +1,6 @@
 from Utils.tools import Tools, CustomException
 from sqlalchemy import text
-from datetime import datetime
+from datetime import datetime, date
 import traceback
 
 class Querys:
@@ -19,11 +19,15 @@ class Querys:
             if not result:
                 raise CustomException("Activo no encontrado.")
             
-            return dict(result._mapping)
+            data = dict(result._mapping)
+            for k, v in data.items():
+                if isinstance(v, datetime):
+                    data[k] = v.strftime('%Y-%m-%d %H:%M:%S')
+                if isinstance(v, date):
+                    data[k] = v.strftime('%Y-%m-%d')
+            return data
         except CustomException as e:
-            traceback.print_exc()
-            print(f"Error al obtener activo por código: {e}")
-            raise CustomException(f"{e}")
+                raise CustomException(f"{e}")
         finally:
             self.db.close()
 
@@ -34,8 +38,6 @@ class Querys:
             result = self.db.execute(text(sql)).fetchall()
             return [dict(row._mapping) for row in result] if result else []
         except CustomException as e:
-            traceback.print_exc()
-            print(f"Error al obtener macroprocesos: {e}")
             raise CustomException(f"{e}")
         finally:
             self.db.close()
@@ -47,8 +49,6 @@ class Querys:
             result = self.db.execute(text(sql)).fetchall()
             return [dict(row._mapping) for row in result] if result else []
         except CustomException as e:
-            traceback.print_exc()
-            print(f"Error al obtener estados: {e}")
             raise CustomException(f"{e}")
         finally:
             self.db.close()
@@ -60,8 +60,6 @@ class Querys:
             result = self.db.execute(text(sql)).fetchall()
             return [dict(row._mapping) for row in result] if result else []
         except CustomException as e:
-            traceback.print_exc()
-            print(f"Error al obtener sedes: {e}")
             raise CustomException(f"{e}")
         finally:
             self.db.close()
@@ -74,8 +72,6 @@ class Querys:
             result = self.db.execute(text(sql)).fetchall()
             return [dict(row._mapping) for row in result] if result else []
         except CustomException as e:
-            traceback.print_exc()
-            print(f"Error al obtener centros: {e}")
             raise CustomException(f"{e}")
         finally:
             self.db.close()
@@ -115,6 +111,7 @@ class Querys:
         finally:
             self.db.close()
 
+    # Query para retirar un activo
     def retirar_activo(self, codigo: str, motivo: str):
         try:
             sql = """
@@ -128,3 +125,153 @@ class Querys:
             raise CustomException(f"{e}")
         finally:
             self.db.close()
+
+    # Query para guardar un activo
+    def guardar_activo(self, data: dict):
+        try:
+            sql = """
+                INSERT INTO intranet_activos (codigo, descripcion, modelo, serie, marca, estado, vida_util, 
+                proveedor, tercero, docto_compra, fecha_compra, caracteristicas, sede, centro, grupo, macroproceso_encargado, 
+                macroproceso, costo_compra)
+                OUTPUT INSERTED.id
+                VALUES (:codigo, :descripcion, :modelo, :serie, :marca, :estado, :vida_util, 
+                :proveedor, :tercero, :docto_compra, :fecha_compra, :caracteristicas, :sede, :centro, :grupo,
+                :macroproceso_encargado, :macroproceso, :costo_compra)"""
+            result = self.db.execute(text(sql), data)
+            inserted_id = result.scalar()
+            self.db.commit()
+            return inserted_id
+        except CustomException as e:
+            traceback.print_exc()
+            print(f"Error al guardar activo: {e}")
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Query para actualizar un activo
+    def actualizar_activo(self, data: dict):
+        try:
+            sql = """
+                UPDATE intranet_activos 
+                SET descripcion = :descripcion, modelo = :modelo, serie = :serie, marca = :marca, estado = :estado, vida_util = :vida_util, 
+                proveedor = :proveedor, tercero = :tercero, docto_compra = :docto_compra, fecha_compra = :fecha_compra, caracteristicas = :caracteristicas, sede = :sede, centro = :centro, grupo = :grupo,
+                macroproceso_encargado = :macroproceso_encargado, macroproceso = :macroproceso, costo_compra = :costo_compra
+                WHERE codigo = :codigo;"""
+            self.db.execute(text(sql), data)
+            self.db.commit()
+        except CustomException as e:
+            traceback.print_exc()
+            print(f"Error al actualizar activo: {e}")
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Query para guardar historial de un activo
+    def guardar_historial(self, data: dict):
+        try:
+            sql = """
+                INSERT INTO intranet_activos_historial (activo_id, descripcion, usuario)
+                VALUES (:activo_id, :descripcion, :usuario);"""
+            self.db.execute(text(sql), data)
+            self.db.commit()
+        except CustomException as e:
+            traceback.print_exc()
+            print(f"Error al guardar historial de activo: {e}")
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Query para consultar el historial de un activo
+    def consultar_historial(self, data: dict):
+        try:
+            
+            sql = """
+                SELECT id FROM intranet_activos WHERE codigo = :codigo;
+            """
+            activo = self.db.execute(text(sql), data).fetchone()
+            if not activo:
+                raise CustomException("Activo no encontrado.")
+
+            sql2 = """
+                SELECT * 
+                FROM intranet_activos_historial 
+                WHERE activo_id = :activo_id AND estado = 1;"""
+            result = self.db.execute(text(sql2), {"activo_id": activo.id}).fetchall()
+            data_list = [dict(row._mapping) for row in result] if result else []
+            if data_list:
+                for row in data_list:
+                    for k, v in row.items():
+                        if isinstance(v, datetime):
+                            row[k] = v.strftime('%Y-%m-%d %H:%M:%S')
+            return data_list
+        except CustomException as e:
+            traceback.print_exc()
+            print(f"Error al consultar historial de activo: {e}")
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Query para obtener macroprocesos por grupo
+    def obtener_macroproceso_x_grupo(self, grupo: str):
+        try:
+            sql = """
+                SELECT ipm.id, ipm.nombre
+                FROM intranet_macroproceso_x_grupo imxp
+                JOIN intranet_perfiles_macroproceso ipm ON ipm.id = imxp.macroproceso_id
+                WHERE imxp.grupo_id = :grupo
+                AND imxp.estado = 1 AND ipm.estado = 1
+            """
+            result = self.db.execute(text(sql), {"grupo": grupo}).fetchall()
+            return [dict(row._mapping) for row in result] if result else []
+        except CustomException as e:
+            traceback.print_exc()
+            print(f"Error al consultar macroprocesos por grupo: {e}")
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Query para obtener el nombre de un campo por su id
+    def obtener_nombre_por_id(self, campo, id_valor):
+        """Obtiene el nombre correspondiente a un id según el campo."""
+        if campo == "sede":
+            result = self.db.execute(text("SELECT nombre FROM intranet_activos_sedes WHERE id = :id"), {"id": id_valor}).fetchone()
+            return result.nombre if result else id_valor
+        elif campo == "centro":
+            result = self.db.execute(text("SELECT descripcion FROM centros WHERE centro = :id"), {"id": id_valor}).fetchone()
+            return result.descripcion if result else id_valor
+        elif campo == "grupo":
+            result = self.db.execute(text("SELECT descripcion FROM activos_gru WHERE grupo = :id"), {"id": id_valor}).fetchone()
+            return result.descripcion if result else id_valor
+        elif campo == "estado":
+            result = self.db.execute(text("SELECT nombre FROM intranet_activos_estados WHERE id = :id"), {"id": id_valor}).fetchone()
+            return result.nombre if result else id_valor
+        elif campo == "macroproceso":
+            result = self.db.execute(text("SELECT nombre FROM intranet_perfiles_macroproceso WHERE id = :id"), {"id": id_valor}).fetchone()
+            return result.nombre if result else id_valor
+        elif campo == "macroproceso_encargado":
+            result = self.db.execute(text("SELECT nombre FROM intranet_perfiles_macroproceso WHERE id = :id"), {"id": id_valor}).fetchone()
+            return result.nombre if result else id_valor
+        elif campo == "tercero":
+            result = self.db.execute(text("SELECT nombres FROM terceros WHERE nit = :id"), {"id": id_valor}).fetchone()
+            return result.nombres if result else id_valor
+        elif campo == "proveedor":
+            result = self.db.execute(text("SELECT nombres FROM terceros WHERE nit = :id"), {"id": id_valor}).fetchone()
+            return result.nombres if result else id_valor
+        # Agrega más campos según necesidad
+        return id_valor
+
+    # Query para generar un mensaje de cambios
+    def generar_mensaje_cambios(self, payload, data_activo):
+        """Genera el mensaje de cambios mostrando nombres en vez de ids para campos especiales."""
+        campos_id = ["sede", "centro", "grupo", "estado", "macroproceso", "macroproceso_encargado", "tercero", "proveedor"]
+        mensaje = []
+        for campo, valor_nuevo in payload.items():
+            valor_actual = data_activo.get(campo)
+            if valor_actual != valor_nuevo:
+                if campo in campos_id:
+                    nombre_actual = self.obtener_nombre_por_id(campo, valor_actual)
+                    nombre_nuevo = self.obtener_nombre_por_id(campo, valor_nuevo)
+                    mensaje.append(f"se cambió el campo {campo} antes: {nombre_actual}, ahora: {nombre_nuevo}")
+                else:
+                    mensaje.append(f"se cambió el campo {campo} antes: {valor_actual}, ahora: {valor_nuevo}")
+        return "; ".join(mensaje)

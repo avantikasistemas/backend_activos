@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Depends
 from sqlalchemy.orm import Session
-from Schemas.Activos.consultar_activo import ConsultarActivo
+from Schemas.Params.macroproceso_x_grupo import MacroprocesoXgrupo
 from Class.Parametros import Parametros
 from Utils.decorator import http_decorator
 from Config.db import get_db
@@ -47,4 +47,11 @@ def obtener_proveedor(request: Request, db: Session = Depends(get_db)):
 @http_decorator
 def obtener_tercero(request: Request, db: Session = Depends(get_db)):
     response = Parametros(db).obtener_tercero()
+    return response
+
+@parametros_router.post('/params/obtener_macroproceso_x_grupo', tags=["Parametros"], response_model=dict)
+@http_decorator
+def obtener_macroproceso_x_grupo(request: Request, macro_x_grupo: MacroprocesoXgrupo, db: Session = Depends(get_db)):
+    data = getattr(request.state, "json_data", {})
+    response = Parametros(db).obtener_macroproceso_x_grupo(data)
     return response

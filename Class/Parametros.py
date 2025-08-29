@@ -21,8 +21,6 @@ class Parametros:
             return self.tools.output(200, "Datos encontrados.", macroprocesos)
 
         except CustomException as e:
-            traceback.print_exc()
-            print(f"Error al obtener información de macroprocesos: {e}")
             raise CustomException(f"{e}")
 
     # Función para obtener los estados
@@ -36,8 +34,6 @@ class Parametros:
             return self.tools.output(200, "Datos encontrados.", estados)
 
         except CustomException as e:
-            traceback.print_exc()
-            print(f"Error al obtener información de estados: {e}")
             raise CustomException(f"{e}")
 
     # Función para obtener las sedes
@@ -51,8 +47,6 @@ class Parametros:
             return self.tools.output(200, "Datos encontrados.", sedes)
 
         except CustomException as e:
-            traceback.print_exc()
-            print(f"Error al obtener información de sedes: {e}")
             raise CustomException(f"{e}")
 
     # Función para obtener los centros
@@ -66,8 +60,6 @@ class Parametros:
             return self.tools.output(200, "Datos encontrados.", centros)
 
         except CustomException as e:
-            traceback.print_exc()
-            print(f"Error al obtener información de centros: {e}")
             raise CustomException(f"{e}")
 
     # Función para obtener los grupos contables
@@ -81,8 +73,6 @@ class Parametros:
             return self.tools.output(200, "Datos encontrados.", grupos)
 
         except CustomException as e:
-            traceback.print_exc()
-            print(f"Error al obtener información de grupos contables: {e}")
             raise CustomException(f"{e}")
 
     # Función para obtener los proveedores
@@ -111,6 +101,17 @@ class Parametros:
             return self.tools.output(200, "Datos encontrados.", empleados)
 
         except CustomException as e:
-            traceback.print_exc()
-            print(f"Error al obtener información de proveedores: {e}")
+            raise CustomException(f"{e}")
+
+    # Función para obtener los macroprocesos por grupo
+    def obtener_macroproceso_x_grupo(self, data):
+        """ Api que realiza la consulta de los macroprocesos por grupo. """
+
+        try:
+            macroprocesos = self.querys.obtener_macroproceso_x_grupo(data["grupo"])
+
+            # Retornamos la información.
+            return self.tools.output(200, "Datos encontrados.", macroprocesos)
+
+        except CustomException as e:
             raise CustomException(f"{e}")

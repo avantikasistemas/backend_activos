@@ -127,91 +127,15 @@ class Tools:
         except Exception as ex:
             print(f"Error al enviar correo a {to_email}: {ex}")
 
+    # Función para generar un mensaje de cambios
+    def generar_mensaje_cambios(self, payload, data_activo):
+        mensaje = []
+        for campo, valor_nuevo in payload.items():
+            valor_actual = data_activo.get(campo)
+            if valor_actual != valor_nuevo:
+                mensaje.append(f"Se cambió el campo {campo} antes: {valor_actual}, ahora: {valor_nuevo}")
+        return "; ".join(mensaje)
 
-    # """ Obtener archivo"""
-    # def get_file_b64(self, file_path):
-    #     with open(file_path, "rb") as file:
-    #         # Leer el contenido binario del archivo PDF
-    #         pdf_content = file.read()
-
-    #         # Codificar el contenido binario en base64
-    #         pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
-
-    #         return pdf_base64
-
-    # async def send_email_error(self, service_name, code, request, response):
-    #     load_dotenv()
-    #     # Obtener enviroment
-    #     stage = os.getenv("STAGE")
-    #     remitente = os.getenv("EMAIL_USER")
-    #     destinatario = os.getenv("EMAIL_DEV")
-
-    #     template_url = f"{BASE_PATH_TEMPLATE}/notificacion_error.html"
-    #     # Preapar el asunto del correo
-    #     subject = f"TOYO - Project: Error service - Stage: {stage}"
-    #     # Preparar el contenido del correo
-    #     data_correo = {
-    #         "servicio": "TOYO",
-    #         "status_code": code,
-    #         "consumo": service_name,
-    #         "id_gestion": "000",
-    #         "url": "Toyo_dev",
-    #         "request": request,
-    #         "response": response
-    #     }
-
-    #     msg = MIMEMultipart()
-    #     msg["Subject"] = subject
-    #     msg["From"] = remitente
-    #     msg["To"] = destinatario
-
-    #     with open(template_url, 'r') as template_file:
-    #         template = template_file.read()
-    #         template = template.format(**data_correo)
-    #     msg.attach(MIMEText(template, 'html'))
-
-    #     # Configura la conexión al servidor SMTP de Gmail
-    #     server = smtplib.SMTP('smtp.gmail.com', 587)
-    #     server.starttls()
-    #     server.login(remitente, os.getenv('EMAIL_PASSWORD'))
-
-    #     # Envía el correo
-    #     server.sendmail(remitente, destinatario, msg.as_string())
-
-    #     # Cierra la conexión con el servidor SMTP
-    #     server.quit()
-
-    # async def send_email(self, recipients, subject, body, attachments=None):
-    #     sender = os.getenv("EMAIL_USER")
-
-    #     msg = MIMEMultipart()
-    #     msg["Subject"] = subject
-    #     msg["From"] = sender
-    #     msg["To"] = recipients
-
-    #     msg.attach(MIMEText(body, 'html'))
-    #     # Agregar archivos adjuntos en formato base64 al mensaje MIME
-    #     if attachments:
-    #         for attachment in attachments:
-    #             # Decodificar el contenido base64
-    #             decoded_data = base64.b64decode(attachment["file"])
-
-    #             # Crear un objeto MIMEBase y adjuntar el archivo decodificado
-    #             attachment_part = MIMEBase('application', 'octet-stream')
-    #             attachment_part.set_payload(decoded_data)
-    #             encoders.encode_base64(attachment_part)
-
-    #             # Establecer el encabezado del archivo adjunto
-    #             attachment_part.add_header('Content-Disposition', f'attachment; filename={attachment["name"]}')
-    #             msg.attach(attachment_part)
-
-    #     # Configurar conexion con servidor SMTP
-    #     server = smtplib.SMTP('smtp.gmail.com', 587)
-    #     server.starttls()
-    #     server.login(sender, os.getenv('EMAIL_PASSWORD'))
-    #     server.sendmail(sender, recipients, msg.as_string())
-    #     # Cerrar conexion Con servidor
-    #     server.quit()
 
 
 class CustomException(Exception):

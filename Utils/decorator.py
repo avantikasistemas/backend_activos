@@ -39,6 +39,8 @@ def http_decorator(func):
                     # Corre la función
                     resultado = func(*args, **kwargs)
                 except CustomException as ce:
+                    print(str(ce))
+                    print(traceback.extract_tb(ce.__traceback__))
                     codigo = ce.codigo
                     message = ce.message
                     data = ce.data
@@ -89,26 +91,6 @@ def http_decorator(func):
                 finally:
                     if codigo != 200:
                         resultado = tool.output(codigo, message, data)
-
-                    # if isinstance(resultado, StreamingResponse):
-                    #     if request.url.path == "/reports/generate_report" :
-                    #         if "flag" in body and body["flag"]:
-                    #             contenido = "IMPRIMIENDO PDF"
-                    # else:
-                    #     if request.url.path == "/reports/create_report" or request.url.path == "/reports/edit_report":
-                    #         body.pop("files")
-                    #     # Acceder al contenido del JSONResponse
-                    #     contenido_serializado = resultado.body  # Esto está en formato bytes
-                    #     contenido = json.loads(contenido_serializado.decode("utf-8"))  # Convertirlo a dict
-
-                    # data_log = {
-                    #     "service": request.url.path,
-                    #     "method": request.method,
-                    #     "request": str(body),
-                    #     "response": str(contenido),
-                    #     "ip": request.client.host,
-                    # }
-                    # querys.insert_data(LogsModel, data_log)
  
             return resultado
     return decorador
