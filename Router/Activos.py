@@ -5,6 +5,7 @@ from Schemas.Activos.retirar_activo import RetirarActivo
 from Schemas.Activos.guardar_activo import GuardarActivo
 from Schemas.Activos.actualizar_activo import ActualizarActivo
 from Schemas.Activos.consultar_historial import ConsultarHistorial
+from Schemas.Activos.activos_x_tercero import ActivosXtercero
 from Class.Activos import Activos
 from Utils.decorator import http_decorator
 from Config.db import get_db
@@ -55,4 +56,18 @@ def actualizar_activo(request: Request, actualizar_activo: ActualizarActivo, db:
 def consultar_historial(request: Request, consultar_historial: ConsultarHistorial, db: Session = Depends(get_db)):
     data = getattr(request.state, "json_data", {})
     response = Activos(db).consultar_historial(data)
+    return response
+
+@activos_router.post('/activos_x_tercero', tags=["Activos"], response_model=dict)
+@http_decorator
+def activos_x_tercero(request: Request, activos_x_tercero: ActivosXtercero, db: Session = Depends(get_db)):
+    data = getattr(request.state, "json_data", {})
+    response = Activos(db).activos_x_tercero(data)
+    return response
+
+@activos_router.post('/generar_acta', tags=["Activos"], response_model=dict)
+@http_decorator
+def generar_acta(request: Request, db: Session = Depends(get_db)):
+    data = getattr(request.state, "json_data", {})
+    response = Activos(db).generar_acta(data)
     return response

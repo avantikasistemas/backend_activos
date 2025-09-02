@@ -1,6 +1,8 @@
 from Utils.tools import Tools, CustomException
 from Utils.querys import Querys
 from datetime import datetime
+from fastapi.responses import StreamingResponse
+from io import BytesIO
 
 class Activos:
 
@@ -107,6 +109,52 @@ class Activos:
 
             # Retornamos la información.
             return self.tools.output(200, "Historial encontrado.", historial)
+
+        except CustomException as e:
+            raise CustomException(f"{e}")
+
+    # Función para consultar los activos de un tercero
+    def activos_x_tercero(self, data: dict):
+        """ Api que realiza la consulta de los activos de un tercero. """
+
+        try:
+            # Asignamos nuestros datos de entrada a sus respectivas variables
+            tercero = data["tercero"]
+            
+            # Consultamos los activos en la base de datos
+            activos = self.querys.activos_x_tercero(tercero)
+
+            # Retornamos la información.
+            return self.tools.output(200, "Activos encontrados.", activos)
+
+        except CustomException as e:
+            raise CustomException(f"{e}")
+
+    # Función para generar un acta
+    def generar_acta(self, data: dict):
+        """ Api que realiza la generación de un acta. """
+
+        try:
+            # Asignamos la firma del creador
+            firma_creador = "Assets/firmas/firma_creador.jpg"
+            
+            pdf = self.tools.generar_acta_pdf(data, firma_creador)
+            
+            file_name = f"{data['tercero']}_{str(datetime.now())}.pdf"
+            
+            return StreamingResponse(
+                BytesIO(pdf),
+                headers={
+                    "Content-Disposition": f"attachment; filename={file_name}",
+                    "Content-Type": "application/pdf",
+                },
+            )
+
+            # Generamos el acta en la base de datos
+            # acta_id = self.querys.generar_acta(activo_id, usuario)
+
+            # # Retornamos la información.
+            # return self.tools.output(200, "Acta generada con éxito.", {"acta_id": acta_id})
 
         except CustomException as e:
             raise CustomException(f"{e}")

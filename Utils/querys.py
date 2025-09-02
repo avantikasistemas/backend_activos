@@ -275,3 +275,45 @@ class Querys:
                 else:
                     mensaje.append(f"se cambió el campo {campo} antes: {valor_actual}, ahora: {valor_nuevo}")
         return "; ".join(mensaje)
+
+    # Query para consultar los activos de un tercero
+    def activos_x_tercero(self, tercero: str):
+        """ Api que realiza la consulta de los activos de un tercero. """
+
+        try:
+            response = dict()
+            list_activos = list()
+
+            # Consultamos los activos en la base de datos
+            sql = """
+            SELECT TOP(1) t.nombres, tt.descripcion AS cargo, a.macroproceso, pm.nombre AS macroproceso_nombre
+            FROM dbo.intranet_activos a
+            LEFT JOIN terceros t ON t.nit = a.tercero
+            LEFT JOIN terceros_3 tt ON tt.concepto_3 = t.concepto_3
+            LEFT JOIN intranet_perfiles_macroproceso pm ON pm.id = a.macroproceso
+            WHERE a.tercero = :tercero
+            """
+            result = self.db.execute(text(sql), {"tercero": tercero}).fetchone()
+            
+            response = {"cabecera": dict(result._mapping)} if result else {}
+            
+            if response:
+                sql2 = """
+                SELECT a.id, a.codigo, a.descripcion, a.modelo, a.serie, a.marca, a.estado, ae.nombre AS estado_nombre
+                FROM dbo.intranet_activos a
+                INNER JOIN dbo.intranet_activos_estados ae ON ae.id = a.estado
+                WHERE a.tercero = :tercero
+                """
+                result2 = self.db.execute(text(sql2), {"tercero": tercero}).fetchall()
+                list_activos = [dict(row._mapping) for row in result2] if result2 else []
+
+                # Agregar la lista de activos a la respuesta
+                response["activos"] = list_activos
+            
+            return response
+                
+
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
