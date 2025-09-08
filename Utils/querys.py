@@ -317,3 +317,57 @@ class Querys:
             raise CustomException(f"{e}")
         finally:
             self.db.close()
+
+    # Query para guardar un acta
+    def guardar_acta(self, data: dict, file_name: str, archivo_ruta: str):
+        """ Api que realiza la creación de un acta. """
+
+        try:
+            sql = """
+            INSERT INTO dbo.intranet_activos_pdfs_generados (tercero, payload, archivo_ruta)
+            OUTPUT INSERTED.id
+            VALUES (:tercero, :payload, :archivo_ruta)
+            """
+            result = self.db.execute(text(sql), {
+                "tercero": data["tercero"],
+                "payload": str(data),
+                "archivo_ruta": archivo_ruta
+            })
+            inserted = result.scalar()
+            self.db.commit()
+            return inserted
+
+        except CustomException as e:
+            raise CustomException(f"{e}")
+
+    # Query para buscar y desactivar actas anteriores de un tercero
+    def buscar_y_desactivar_actas_anteriores(self, tercero: str):
+        """ Desactiva las actas anteriores de un tercero. """
+        try:
+            sql = """
+            UPDATE dbo.intranet_activos_pdfs_generados
+            SET estado = 0
+            WHERE tercero = :tercero AND estado = 1
+            """
+            self.db.execute(text(sql), {"tercero": tercero})
+            self.db.commit()
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Query para actualizar el link del acta generada
+    def actualizar_link_acta(self, acta_id: int, link_pdf: str):
+        """ Actualiza el link del acta generada. """
+        try:
+            sql = """
+            UPDATE dbo.intranet_activos_pdfs_generados
+            SET link_pdf = :link_pdf
+            WHERE id = :acta_id
+            """
+            self.db.execute(text(sql), {"link_pdf": link_pdf, "acta_id": acta_id})
+            self.db.commit()
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()

@@ -111,6 +111,7 @@ class Tools:
     # Función para enviar correos electrónicos
     def send_email_individual(self, to_email, cc_emails, subject, body, logo_path=None, mail_sender=None):
         """Envía un correo electrónico a un destinatario con copia a otros y adjunta un logo si está disponible."""
+        print(11111)
         msg = MIMEMultipart()
         msg['From'] = mail_sender
         msg['To'] = to_email
@@ -131,6 +132,9 @@ class Tools:
                 print(f"Error adjuntando el logo: {e}")
         
         try:
+            print(22222)
+            print(SMTP_SERVER)
+            print(SMTP_PORT)
             with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
                 server.sendmail(mail_sender, [to_email] + cc_emails, msg.as_string())
             print(f"Correo enviado a {to_email} con copia a {', '.join(cc_emails)}")
@@ -173,42 +177,6 @@ class Tools:
 
         # Dibujar la tabla de activos entregados
         self.dibujar_tabla_activos_entregados(pdf, activos, 540)
-
-        # # Function for set the X mark on the report
-        # self.set_type_service(pdf, data["type_service"])
-
-        # # Ajustamos descripción dinamicamente
-        # y_position = 527
-        # y_position = self.ajust_long_text(
-        #     pdf,
-        #     "DESCRIPCIÓN DE LA ACTIVIDAD: ",
-        #     data['service_description'], 
-        #     32, 
-        #     y_position, 
-        #     510
-        # )
-
-        # # Ajustamos informatión dinamicamente
-        # y_position -= 30
-        # y_position = self.ajust_long_text(
-        #     pdf,
-        #     "",
-        #     data['information'], 
-        #     32, 
-        #     y_position, 
-        #     510
-        # )
-
-        # # Ajustar la lista de tareas justo debajo de la descripción
-        # tasks = data["tasks"]
-        # if tasks:
-        #     y_position = self.ajust_list(pdf, tasks, x=28, y=y_position - 20)  # Ajusta el espaciado
-
-        # # Agregar las imágenes justo debajo de la lista de mantenimiento
-        # image_paths = data["files"]
-        # if image_paths:
-        #     max_height = 170  # Altura mínima para imágenes
-        #     y_position = self.ajust_images(pdf, image_paths, x=100, y=0, max_height=max_height, page_height=letter[1])
 
         # Guardar el PDF con los datos escritos en el buffer
         pdf.save()

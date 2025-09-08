@@ -23,13 +23,18 @@ def consultar_activo(request: Request, consultar_activo: ConsultarActivo, db: Se
 @activos_router.post('/retirar_activo', tags=["Activos"], response_model=dict)
 @http_decorator
 def retirar_activo(request: Request, retirar_activo: RetirarActivo, db: Session = Depends(get_db)):
+    ip = request.client.host
+    try:
+        hostname = socket.gethostbyaddr(ip)[0]
+    except Exception:
+        hostname = None
     data = getattr(request.state, "json_data", {})
-    response = Activos(db).retirar_activo(data)
+    response = Activos(db).retirar_activo(data, hostname)
     return response
 
 @activos_router.post('/guardar_activo', tags=["Activos"], response_model=dict)
 @http_decorator
-def guardar_activo(request: Request, guardar_activo: GuardarActivo, db: Session = Depends(get_db)):
+def guardar_activo(request: Request, db: Session = Depends(get_db)):
     ip = request.client.host
     try:
         hostname = socket.gethostbyaddr(ip)[0]
@@ -41,7 +46,7 @@ def guardar_activo(request: Request, guardar_activo: GuardarActivo, db: Session 
 
 @activos_router.post('/actualizar_activo', tags=["Activos"], response_model=dict)
 @http_decorator
-def actualizar_activo(request: Request, actualizar_activo: ActualizarActivo, db: Session = Depends(get_db)):
+def actualizar_activo(request: Request, db: Session = Depends(get_db)):
     ip = request.client.host
     try:
         hostname = socket.gethostbyaddr(ip)[0]
@@ -70,4 +75,11 @@ def activos_x_tercero(request: Request, activos_x_tercero: ActivosXtercero, db: 
 def generar_acta(request: Request, db: Session = Depends(get_db)):
     data = getattr(request.state, "json_data", {})
     response = Activos(db).generar_acta(data)
+    return response
+
+@activos_router.post('/enviar_correo', tags=["Activos"], response_model=dict)
+@http_decorator
+def enviar_correo(request: Request, db: Session = Depends(get_db)):
+    data = getattr(request.state, "json_data", {})
+    response = Activos(db).enviar_correo(data)
     return response
