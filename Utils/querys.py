@@ -2,6 +2,8 @@ from Utils.tools import Tools, CustomException
 from sqlalchemy import text
 from datetime import datetime, date
 import traceback
+import json
+import ast
 
 class Querys:
 
@@ -367,6 +369,80 @@ class Querys:
             """
             self.db.execute(text(sql), {"link_pdf": link_pdf, "acta_id": acta_id})
             self.db.commit()
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Query para verificar si un tercero existe
+    def check_tercero(self, nit: str):
+        """ Verifica si un tercero existe en la base de datos. """
+        try:
+            sql = """ SELECT * FROM terceros WHERE nit = :nit """
+            result = self.db.execute(text(sql), {"nit": nit}).fetchone()
+
+            if not result:
+                raise CustomException("Tercero no encontrado.")
+            
+            if result.bloqueo != 0:
+                raise CustomException("Tercero bloqueado.")
+            
+            return dict(result._mapping)
+
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Query para obtener el link del acta generada
+    def get_link_acta(self, nit: str):
+        """ Obtiene el link del acta generada para un tercero. """
+        try:
+            sql = """
+            SELECT TOP(1) * 
+            FROM dbo.intranet_activos_pdfs_generados 
+            WHERE tercero = :nit AND estado = 1
+            ORDER BY id DESC
+            """
+            result = self.db.execute(text(sql), {"nit": nit}).fetchone()
+
+            if not result or not result.link_pdf:
+                raise CustomException("Acta no encontrada.")
+            
+            return dict(result._mapping)
+
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Query para consultar los datos del pdf
+    def consultar_datos_pdf(self, pdf_generado_id: int):
+        """  """
+        try:
+            sql = """
+            SELECT TOP(1) * 
+            FROM dbo.intranet_activos_pdfs_generados 
+            WHERE id = :pdf_generado_id AND estado = 1
+            ORDER BY id DESC
+            """
+            result = self.db.execute(text(sql), {"pdf_generado_id": pdf_generado_id}).fetchone()
+
+            if not result:
+                raise CustomException("Acta no encontrada.")
+
+            row = dict(result._mapping)
+
+            # 🔑 Arreglar el campo payload si existe
+            if "payload" in row and row["payload"]:
+                try:
+                    # El payload está guardado como string tipo dict de Python → lo convertimos
+                    row["payload"] = json.dumps(ast.literal_eval(row["payload"]))
+                except Exception:
+                    pass  # si ya viene como JSON válido, no hacemos nada
+
+            return row
+
         except CustomException as e:
             raise CustomException(f"{e}")
         finally:

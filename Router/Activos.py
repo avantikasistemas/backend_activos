@@ -83,3 +83,17 @@ def enviar_correo(request: Request, db: Session = Depends(get_db)):
     data = getattr(request.state, "json_data", {})
     response = Activos(db).enviar_correo(data)
     return response
+
+@activos_router.post('/consultar_datos_pdf', tags=["Activos"], response_model=dict)
+@http_decorator
+def consultar_datos_pdf(request: Request, db: Session = Depends(get_db)):
+    data = getattr(request.state, "json_data", {})
+    response = Activos(db).consultar_datos_pdf(data)
+    return response
+
+@activos_router.post('/responder_acta', tags=["Activos"], response_model=dict)
+@http_decorator
+def responder_acta(request: Request, db: Session = Depends(get_db)):
+    data = getattr(request.state, "json_data", {})
+    response = Activos(db).responder_acta(data)
+    return response

@@ -2,9 +2,18 @@ from Utils.tools import Tools, CustomException
 from Utils.querys import Querys
 from datetime import datetime
 from fastapi.responses import StreamingResponse
+import io
 from io import BytesIO
 import os
 from urllib.parse import urljoin
+import base64
+import uuid
+import re
+from io import BytesIO
+from PIL import Image
+
+UPLOAD_FOLDER = "Uploads/"
+EXTENSIONES = ["jpg", "jpeg", "png"]
 
 class Activos:
 
@@ -197,34 +206,28 @@ class Activos:
         except CustomException as e:
             raise CustomException(f"{e}")
 
+    # Función para enviar el correo con el acta
     def enviar_correo(self, data: dict):
         """ Api que realiza el envío del correo con el acta. """
 
         try:
-            
-            body = f"""\
-                <!DOCTYPE html>
-                <html lang="es">
-                    <head>
-                        <meta charset="utf-8">
-                        <meta name="x-apple-disable-message-reformatting">
-                        <meta name="viewport" content="width=device-width,initial-scale=1">
-                        <title>Notificación de Anulación</title>
-                    </head>
-                    <body style="margin:0;padding:0;background:#f4f6f8;">
-                        <h4>prueba</h4>
-                    </body>
-                </html>
-            """
-            
+
+            data_tercero = self.querys.check_tercero(data['tercero'])
+
+            correo_destino = data_tercero["mail"]
+
+            data_link = self.querys.get_link_acta(data['tercero'])
+
+            body_correo = self.build_correo(data_link["link_pdf"], data_tercero)
+
             # Enviamos el correo
             self.tools.send_email_individual(
-                to_email="sistemas@avantika.com.co",
-                cc_emails=["auxiliartic@avantika.com.co", "sistemas@avantika.com.co"],
-                subject="Prueba",
-                body=body,
+                to_email=correo_destino,
+                cc_emails=["auxiliartic@avantika.com.co"],
+                subject="Acta de Activos - Avantika",
+                body=body_correo,
                 logo_path=None,
-                mail_sender="sistemas@avantika.com.co"
+                mail_sender="auxiliartic@avantika.com.co"
             )
 
             # Retornamos la información.
@@ -232,3 +235,129 @@ class Activos:
 
         except CustomException as e:
             raise CustomException(f"{e}")
+
+    # Función para construir el correo
+    def build_correo(self, link: str, data_tercero: dict):
+        """ Función que construye el cuerpo del correo. """
+
+        body = f"""\
+            <!DOCTYPE html>
+            <html lang="es">
+                <head>
+                    <meta charset="utf-8">
+                    <meta name="x-apple-disable-message-reformatting">
+                    <meta name="viewport" content="width=device-width,initial-scale=1">
+                    <title>Notificación Acta de Activos</title>
+                </head>
+                <body style="margin:0;padding:0;background:#f4f6f8;">
+                    <h4>Buen día estimado/a: {data_tercero['nombres']}</h4>
+                    <p>A continuación te dejo el siguiente link donde podrás ver tus activos asignados y realizar el proceso de firma.</p>
+                    <strong><p><a href="{link}">Ver Acta de Activos</a></p></strong>
+                </body>
+            </html>
+        """
+        return body
+
+    # Función para consultar los datos para el PDF
+    def consultar_datos_pdf(self, data: dict):
+        """ Api que realiza la consulta de los datos para el PDF. """
+
+        try:
+            # Consultamos los datos en la base de datos
+            datos_pdf = self.querys.consultar_datos_pdf(data["pdf_generado_id"])
+
+            # Retornamos la información.
+            return self.tools.output(200, "Datos encontrados.", datos_pdf)
+
+        except CustomException as e:
+            raise CustomException(f"{e}")
+
+    # Función para responder un acta
+    def responder_acta(self, data: dict):
+        """ Api que realiza la respuesta del acta. """
+
+        try:
+            pdf_generado_id = data["pdf_generado_id"]
+            observaciones = data["observaciones"]
+            firma_tercero = data["firma_tercero"]
+
+            if firma_tercero:
+                self.proccess_image(pdf_generado_id, firma_tercero)
+
+            # Actualizamos la respuesta del acta en la base de datos
+            # self.querys.responder_acta(data)
+
+            # Retornamos la información.
+            return self.tools.output(200, "Acta respondida con éxito.")
+
+        except CustomException as e:
+            raise CustomException(f"{e}")
+
+    # Función para procesar imagen
+    def proccess_image(self, pdf_generado_id, firma_tercero):
+
+        # Procesar y guardar cada archivo de la lista "files"
+
+        isbase64 = True if firma_tercero.startswith("data:image/") else False
+
+        # if not isbase64:
+        #     self.querys.find_image_and_update_version_two(ReportFilesModel, id_report, file_base64)
+        #     continue
+            
+        try:
+            # Extraer el formato de la imagen
+            file_extension = self.extract_file_extension(firma_tercero)
+
+            # Verificar si la extensión es válida
+            if file_extension not in EXTENSIONES:
+                raise CustomException(f"Extensión no permitida: {file_extension}")
+
+            # Eliminar el prefijo base64 antes de decodificar
+            base64_data = re.sub(r"^data:image/\w+;base64,", "", firma_tercero)
+
+            # Decodificar la imagen base64
+            file_data = base64.b64decode(base64_data)
+
+            # Open the image with Pillow
+            image = Image.open(io.BytesIO(file_data))
+
+            # Compress the image (resize or adjust quality)
+            compressed_image_io = io.BytesIO()
+            image = image.convert("RGB")  # Ensure the image is in RGB format (no alpha channel)
+            
+            # Save with compression
+            image.save(
+                compressed_image_io,
+                format="JPEG",  # Convert to JPEG for better compression
+                optimize=True,
+                quality=75  # Adjust the quality (lower = more compression)
+            )
+            compressed_image_io.seek(0)
+            compressed_data = compressed_image_io.read()
+
+        except CustomException as e:
+            print(e)
+            raise CustomException(f"Error al decodificar la imagen: {str(e)}")
+
+        # Generar un nombre único para cada archivo
+        file_name = f"{str(uuid.uuid4())}.{file_extension}"
+        file_path = os.path.join(UPLOAD_FOLDER, file_name)
+
+        # Guardar la imagen decodificada en el servidor
+        try:
+            with open(file_path, "wb") as file:
+                file.write(compressed_data)
+        except CustomException as e:
+            print(e)
+            raise CustomException(f"Error al guardar la imagen: {str(e)}")
+
+        return True
+    
+    # Busca el prefijo que indica el tipo de archivo, como data:image/jpeg;base64,
+    def extract_file_extension(self, file_base64: str):
+        match = re.match(r"data:image/(?P<ext>\w+);base64,", file_base64)
+        if not match:
+            raise ValueError("Formato de imagen no válido o prefijo faltante")
+        
+        # Extrae la extensión (jpg, png, etc.)
+        return match.group("ext")

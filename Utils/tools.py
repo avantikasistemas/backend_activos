@@ -111,7 +111,7 @@ class Tools:
     # Función para enviar correos electrónicos
     def send_email_individual(self, to_email, cc_emails, subject, body, logo_path=None, mail_sender=None):
         """Envía un correo electrónico a un destinatario con copia a otros y adjunta un logo si está disponible."""
-        print(11111)
+
         msg = MIMEMultipart()
         msg['From'] = mail_sender
         msg['To'] = to_email
@@ -132,7 +132,6 @@ class Tools:
                 print(f"Error adjuntando el logo: {e}")
         
         try:
-            print(22222)
             print(SMTP_SERVER)
             print(SMTP_PORT)
             with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
