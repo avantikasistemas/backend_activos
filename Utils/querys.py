@@ -349,7 +349,7 @@ class Querys:
             sql = """
             UPDATE dbo.intranet_activos_pdfs_generados
             SET estado = 0
-            WHERE tercero = :tercero AND estado = 1
+            WHERE tercero = :tercero AND estado = 1 and firmado_tercero = 0
             """
             self.db.execute(text(sql), {"tercero": tercero})
             self.db.commit()
@@ -443,6 +443,22 @@ class Querys:
 
             return row
 
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Query para actualizar el campo firma_tercero
+    def actualizar_firma_acta(self, pdf_generado_id: int):
+        """ Actualiza el campo firma en la tabla intranet_activos_pdfs_generados """
+        try:
+            sql = """
+            UPDATE dbo.intranet_activos_pdfs_generados
+            SET firmado_tercero = 1
+            WHERE id = :pdf_generado_id
+            """
+            self.db.execute(text(sql), {"pdf_generado_id": pdf_generado_id})
+            self.db.commit()
         except CustomException as e:
             raise CustomException(f"{e}")
         finally:

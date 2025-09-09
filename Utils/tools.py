@@ -150,7 +150,7 @@ class Tools:
         return "; ".join(mensaje)
 
     # Función para generar un pdf
-    def generar_acta_pdf(self, data, firma_creador):
+    def generar_acta_pdf(self, data):
 
         # Ruta del archivo PDF original
         original_pdf_path = os.path.join('Templates', 'acta_entrega.pdf')
@@ -328,6 +328,146 @@ class Tools:
             y -= row_height
         pdf.setFillColorRGB(0, 0, 0)
         return y
+
+    # Lógica para reescribir el acta
+    def reescribir_acta(self, archivo_ruta, file_path, observaciones):
+        """ Reescribe el acta agregando una página nueva con observaciones y firma, y retorna bytes. """
+        # 1. Abrir el PDF original
+        reader = PdfReader(archivo_ruta)
+        writer = PdfWriter()
+        
+        # 2) Copiar todas las páginas originales sin cambios
+        for page in reader.pages:
+            writer.add_page(page)
+            
+        # 3) Crear una nueva página con ReportLab
+        packet = BytesIO()
+        width, height = letter  # (612 x 792 pt)
+        pdf = canvas.Canvas(packet, pagesize=letter)
+        
+        pdf.setFont('Helvetica-Bold', 11)
+        pdf.setFillColorRGB(0.31, 0.51, 0.75)  # #4f81bf
+        pdf.drawString(35, height - 72, "3. OSERVACIONES")
+        pdf.setFillColorRGB(0, 0, 0)  # Restaurar color negro
+
+        # Observaciones (AJUSTE: wrap al ancho de la página)
+        pdf.setFont("Helvetica", 10)
+        y = height - 100
+        left_margin = 35
+        right_margin = 35
+        text_width = width - left_margin - right_margin
+        line_height = 14
+        font_name = "Helvetica"
+        font_size = 10
+        
+        def wrap_line(texto: str):
+            # Envuelve una sola línea según el ancho disponible (medido con stringWidth)
+            words = texto.split()
+            if not words:
+                return [""]
+            lines = []
+            current = words[0]
+            for w in words[1:]:
+                trial = current + " " + w
+                if pdf.stringWidth(trial, font_name, font_size) <= text_width:
+                    current = trial
+                else:
+                    lines.append(current)
+                    current = w
+            lines.append(current)
+            return lines
+
+        for raw in (observaciones or "").splitlines():
+            for linea in wrap_line(raw):
+                pdf.drawString(left_margin, y, linea)
+                y -= line_height
+
+        # Firmas (dos imágenes: creador a la izquierda y file_path a la derecha)
+        # Rutas y parámetros base
+        firma_creador = "Assets/firmas/firma_creador.jpg"
+        base_y = 100                     # altura base de las firmas
+        target_w = 200.0                 # ancho objetivo de las firmas
+        target_h_max = 80.0              # alto máximo permitido
+        label_offset = -12               # desplazamiento vertical para el texto de la etiqueta
+
+        # --- Firma izquierda: creador ---
+        try:
+            img_left = ImageReader(firma_creador)
+            iw, ih = img_left.getSize()
+            th = target_w * (ih / float(iw))
+            if th > target_h_max:
+                scale = target_h_max / th
+                tw_left = target_w * scale
+                th_left = target_h_max
+            else:
+                tw_left = target_w
+                th_left = th
+
+            x_left = left_margin  # usa tu margen izquierdo existente
+            pdf.drawImage(
+                img_left, x_left, base_y,
+                width=tw_left, height=th_left,
+                preserveAspectRatio=True, mask='auto'
+            )
+            pdf.setFont("Helvetica", 9)
+            pdf.drawString(x_left, base_y + label_offset, "Firma creador")
+        except Exception as e:
+            pdf.setFont("Helvetica-Oblique", 9)
+            pdf.drawString(left_margin, base_y + 10, f"[No se pudo cargar firma creador: {e}]")
+
+        # --- Firma derecha: la de file_path ---
+        try:
+            img_right = ImageReader(file_path)
+            iw2, ih2 = img_right.getSize()
+            th2 = target_w * (ih2 / float(iw2))
+            if th2 > target_h_max:
+                scale2 = target_h_max / th2
+                tw_right = target_w * scale2
+                th_right = target_h_max
+            else:
+                tw_right = target_w
+                th_right = th2
+
+            # colocar a la derecha respetando el margen derecho
+            x_right = width - right_margin - tw_right
+            pdf.drawImage(
+                img_right, x_right, base_y,
+                width=tw_right, height=th_right,
+                preserveAspectRatio=True, mask='auto'
+            )
+            pdf.setFont("Helvetica", 9)
+            pdf.drawString(x_right, base_y + label_offset, "Firma")
+        except Exception as e:
+            pdf.setFont("Helvetica-Oblique", 9)
+            pdf.drawString(width - right_margin - 200, base_y + 10, f"[No se pudo cargar firma: {e}]")
+
+        pdf.showPage()
+        pdf.save()
+
+        # 4) Añadir la nueva página al PDF
+        packet.seek(0)
+        overlay_pdf = PdfReader(packet)
+        writer.add_page(overlay_pdf.pages[0])
+
+        # 5) Guardar en memoria -> devolver **bytes**
+        output_stream = BytesIO()
+        writer.write(output_stream)
+        pdf_bytes = output_stream.getvalue()  # <-- bytes
+        output_stream.close()
+        
+        # --- sobrescribir el archivo original ---
+        with open(archivo_ruta, "wb") as f:
+            f.write(pdf_bytes)
+            
+        # Eliminar firma temporal (file_path)
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception:
+            # No interrumpir el flujo si no se puede borrar (permiso, inexistente, etc.)
+            pass
+    
+        return pdf_bytes  
 
 class CustomException(Exception):
     """ Esta clase hereda de la clase Exception y permite

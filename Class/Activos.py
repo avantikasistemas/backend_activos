@@ -158,18 +158,39 @@ class Activos:
         """ Api que realiza la generación de un acta. """
 
         try:
-            # Asignamos la firma del creador
-            firma_creador = "Assets/firmas/firma_creador.jpg"
+            # Asignamos el tercero
+            tercero = data["tercero"]
+            macroproceso_id = data["payload"]["cabecera"]["macroproceso"]
+            
+            # Validamos que el tercero exista            
+            if not macroproceso_id:
+                raise CustomException("Tercero no tiene macroproceso asignado.")
 
             # Generamos el PDF del acta
-            pdf_bytes = self.tools.generar_acta_pdf(data, firma_creador)
+            pdf_bytes = self.tools.generar_acta_pdf(data)
 
             # Creamos el nombre del archivo (sin caracteres inválidos)
             fecha_str = datetime.now().strftime("%Y%m%d_%H%M%S")
             file_name = f"{data['tercero']}_acta_{fecha_str}.pdf"
+            
+            # Obtenemos los macroprocesos
+            macroprocesos = self.querys.obtener_macroprocesos()
+            
+            # buscar el macroproceso activo por id
+            macro = next(
+                (m for m in macroprocesos 
+                    if int(m.get("id")) == int(macroproceso_id)), None
+            )
+
+            # Validamos que el macroproceso exista y esté activo
+            if not macro:
+                raise CustomException("Macroproceso no válido o inactivo")
+
+            # Obtenemos la carpeta del macroproceso
+            carpeta = macro["nombre_carpeta"]
 
             # Esta ruta hay que armarla con el macroproceso correspondiente
-            archivo_ruta = f"Uploads/Macroprocesos/TIC/{file_name}"
+            archivo_ruta = f"Uploads/Macroprocesos/{carpeta}/{file_name}"
 
             # Guardar el PDF en la ruta especificada
             os.makedirs(os.path.dirname(archivo_ruta), exist_ok=True)
@@ -280,12 +301,30 @@ class Activos:
             pdf_generado_id = data["pdf_generado_id"]
             observaciones = data["observaciones"]
             firma_tercero = data["firma_tercero"]
+            archivo_ruta = data["archivo_ruta"]
+            file_path = ''
+            
+            data_pdf = self.querys.consultar_datos_pdf(pdf_generado_id)
+            if data_pdf["firmado_tercero"] == 1:
+                return self.tools.output(210, "Acta ya se encuentra firmada.")
 
             if firma_tercero:
-                self.proccess_image(pdf_generado_id, firma_tercero)
+                file_path = self.proccess_image(firma_tercero)
+                
+            archivo_final = self.tools.reescribir_acta(archivo_ruta, file_path, observaciones)
+            
+            self.querys.actualizar_firma_acta(pdf_generado_id)
+            
+            # Retornamos la información.
+            return StreamingResponse(
+                BytesIO(archivo_final),
+                headers={
+                    "Content-Disposition": f"attachment; filename={file_path}",
+                    "Content-Type": "application/pdf",
+                },
+            )
 
-            # Actualizamos la respuesta del acta en la base de datos
-            # self.querys.responder_acta(data)
+
 
             # Retornamos la información.
             return self.tools.output(200, "Acta respondida con éxito.")
@@ -294,16 +333,8 @@ class Activos:
             raise CustomException(f"{e}")
 
     # Función para procesar imagen
-    def proccess_image(self, pdf_generado_id, firma_tercero):
+    def proccess_image(self, firma_tercero):
 
-        # Procesar y guardar cada archivo de la lista "files"
-
-        isbase64 = True if firma_tercero.startswith("data:image/") else False
-
-        # if not isbase64:
-        #     self.querys.find_image_and_update_version_two(ReportFilesModel, id_report, file_base64)
-        #     continue
-            
         try:
             # Extraer el formato de la imagen
             file_extension = self.extract_file_extension(firma_tercero)
@@ -351,7 +382,7 @@ class Activos:
             print(e)
             raise CustomException(f"Error al guardar la imagen: {str(e)}")
 
-        return True
+        return file_path
     
     # Busca el prefijo que indica el tipo de archivo, como data:image/jpeg;base64,
     def extract_file_extension(self, file_base64: str):
