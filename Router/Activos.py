@@ -97,3 +97,10 @@ def responder_acta(request: Request, db: Session = Depends(get_db)):
     data = getattr(request.state, "json_data", {})
     response = Activos(db).responder_acta(data)
     return response
+
+@activos_router.post('/descargar_copia', tags=["Activos"], response_model=dict)
+@http_decorator
+def descargar_copia(request: Request, db: Session = Depends(get_db)):
+    data = getattr(request.state, "json_data", {})
+    response = Activos(db).descargar_copia(data)
+    return response

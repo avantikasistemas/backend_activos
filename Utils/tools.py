@@ -170,9 +170,9 @@ class Tools:
         activos = data["payload"]["activos"]
 
         # Escribir datos en el PDF
-        pdf.drawString(262, 605, f"{cabecera['nombres']}")
-        pdf.drawString(86, 589, f"{cabecera['cargo']}")
-        pdf.drawString(170, 574, f"{cabecera['macroproceso_nombre']}")
+        pdf.drawString(262, 600, f"{cabecera['nombres']}")
+        pdf.drawString(86, 584, f"{cabecera['cargo']}")
+        pdf.drawString(170, 569, f"{cabecera['macroproceso_nombre']}")
 
         # Dibujar la tabla de activos entregados
         self.dibujar_tabla_activos_entregados(pdf, activos, 540)
@@ -411,6 +411,7 @@ class Tools:
             )
             pdf.setFont("Helvetica", 9)
             pdf.drawString(x_left, base_y + label_offset, "Firma creador")
+            pdf.drawString(250, base_y + label_offset, datetime.now().strftime("%Y%m%d_%H%M%S"))
         except Exception as e:
             pdf.setFont("Helvetica-Oblique", 9)
             pdf.drawString(left_margin, base_y + 10, f"[No se pudo cargar firma creador: {e}]")
@@ -436,7 +437,7 @@ class Tools:
                 preserveAspectRatio=True, mask='auto'
             )
             pdf.setFont("Helvetica", 9)
-            pdf.drawString(x_right, base_y + label_offset, "Firma")
+            pdf.drawString(x_right, base_y + label_offset, "Firma Tercero")
         except Exception as e:
             pdf.setFont("Helvetica-Oblique", 9)
             pdf.drawString(width - right_margin - 200, base_y + 10, f"[No se pudo cargar firma: {e}]")

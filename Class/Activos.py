@@ -392,3 +392,27 @@ class Activos:
         
         # Extrae la extensión (jpg, png, etc.)
         return match.group("ext")
+
+    # Función que descarga una copia del acta final
+    def descargar_copia(self, data: dict):
+        """ Api que realiza la descarga de una copia del acta. """
+
+        try:
+            # Consultamos los datos en la base de datos
+            datos_pdf = self.querys.consultar_datos_pdf(data["pdf_generado_id"])
+
+            # Leemos el archivo PDF
+            with open(datos_pdf["archivo_ruta"], "rb") as f:
+                pdf_bytes = f.read()
+
+            # Retornamos la información.
+            return StreamingResponse(
+                BytesIO(pdf_bytes),
+                headers={
+                    "Content-Disposition": f"attachment; filename={datos_pdf['archivo_ruta']}",
+                    "Content-Type": "application/pdf",
+                },
+            )
+
+        except CustomException as e:
+            raise CustomException(f"{e}")

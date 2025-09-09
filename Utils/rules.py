@@ -13,6 +13,7 @@ class Rules:
             "/retirar_activo": self.__val_retirar_activo,
             "/guardar_activo": self.__val_guardar_activo,
             "/actualizar_activo": self.__val_actualizar_activo,
+            "/responder_acta": self.__val_responder_acta,
         }
         # Se obtiene la funcion a ejecutar
         func = path_dict.get(path, None)
@@ -276,3 +277,20 @@ class Rules:
             }
         ]
         return validacion_dict
+
+    def __val_responder_acta(self, params):
+            validacion_dict = [
+                {
+                    "tipo": "string",
+                    "campo": "observaciones",
+                    "valor": params["observaciones"],
+                    "obligatorio": True,
+                },
+                {
+                    "tipo": "string",
+                    "campo": "firma_tercero",
+                    "valor": params["firma_tercero"],
+                    "obligatorio": True,
+                },
+            ]
+            return validacion_dict
