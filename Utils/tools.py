@@ -132,8 +132,6 @@ class Tools:
                 print(f"Error adjuntando el logo: {e}")
         
         try:
-            print(SMTP_SERVER)
-            print(SMTP_PORT)
             with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
                 server.sendmail(mail_sender, [to_email] + cc_emails, msg.as_string())
             print(f"Correo enviado a {to_email} con copia a {', '.join(cc_emails)}")
@@ -174,6 +172,43 @@ class Tools:
         pdf.drawString(86, 584, f"{cabecera['cargo']}")
         pdf.drawString(170, 569, f"{cabecera['macroproceso_nombre']}")
 
+        logo = "Assets/img/logotipo.png"
+
+        # --- Logo en esquina superior (prueba) ---
+        try:
+            # Cargar imagen y calcular tamaño manteniendo proporción
+            img_logo = ImageReader(logo)
+            iw, ih = img_logo.getSize()
+
+            page_w, page_h = letter
+            max_w = 120   # ancho máximo de prueba
+            max_h = 50    # alto máximo de prueba
+            scale = min(max_w / float(iw), max_h / float(ih))
+            logo_w = iw * scale
+            logo_h = ih * scale
+
+            margin = 35
+
+            # Esquina superior IZQUIERDA:
+            x = margin
+            y = page_h - margin - logo_h
+
+            # (Si lo quieres en la esquina superior DERECHA, usa esta línea en vez de la anterior)
+            # x = page_w - margin - logo_w
+
+            pdf.drawImage(
+                img_logo,
+                x, y,
+                width=logo_w,
+                height=logo_h,
+                preserveAspectRatio=True,
+                mask='auto'  # respeta transparencia si es PNG
+            )
+        except Exception as e:
+            # Si falla, no interrumpe la generación del PDF
+            pdf.setFont('Helvetica', 8)
+            pdf.drawString(20, 20, f"[No se pudo cargar el logo: {e}]")
+
         # Dibujar la tabla de activos entregados
         self.dibujar_tabla_activos_entregados(pdf, activos, 540)
 
@@ -210,7 +245,7 @@ class Tools:
     # Función para dibujar la tabla de activos entregados
     def dibujar_tabla_activos_entregados(self, pdf, activos, y_start):
         # Parámetros de la tabla
-        headers = ["Código", "Descripcion", "Marca", "Serial", "Estado"]
+        headers = ["Codigo", "Descripcion", "Marca", "Serial", "Estado"]
         col_widths = [45, 200, 80, 150, 90]
         x_start = 25
         # Altura de la página menos margen inferior

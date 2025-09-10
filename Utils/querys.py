@@ -304,7 +304,7 @@ class Querys:
                 SELECT a.id, a.codigo, a.descripcion, a.modelo, a.serie, a.marca, a.estado, ae.nombre AS estado_nombre
                 FROM dbo.intranet_activos a
                 INNER JOIN dbo.intranet_activos_estados ae ON ae.id = a.estado
-                WHERE a.tercero = :tercero
+                WHERE a.tercero = :tercero AND a.retirado = 0
                 """
                 result2 = self.db.execute(text(sql2), {"tercero": tercero}).fetchall()
                 list_activos = [dict(row._mapping) for row in result2] if result2 else []

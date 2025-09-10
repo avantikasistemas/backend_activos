@@ -11,6 +11,7 @@ import uuid
 import re
 from io import BytesIO
 from PIL import Image
+import json
 
 UPLOAD_FOLDER = "Uploads/"
 EXTENSIONES = ["jpg", "jpeg", "png"]
@@ -314,6 +315,34 @@ class Activos:
             archivo_final = self.tools.reescribir_acta(archivo_ruta, file_path, observaciones)
             
             self.querys.actualizar_firma_acta(pdf_generado_id)
+
+            # Asignamos el payload
+            payload_general = json.loads(data_pdf['payload'])
+
+            # Asignamos el tercero
+            tercero = data_pdf['tercero']
+
+            # Obtenemos el nombre del tercero
+            tercero_nombre = payload_general['payload']['cabecera']['nombres']
+
+            # Enviamos el correo de respuesta
+            body_correo = self.build_correo_respuesta(tercero_nombre)
+
+            # Consultamos la información del tercero
+            data_tercero = self.querys.check_tercero(tercero)
+
+            # Obtenemos el correo del tercero
+            correo_tercero = data_tercero["mail"]
+
+            # Enviamos el correo
+            self.tools.send_email_individual(
+                to_email="auxiliartic@avantika.com.co",
+                cc_emails=[],
+                subject="Acta Final de Activos - Avantika",
+                body=body_correo,
+                logo_path=None,
+                mail_sender=correo_tercero
+            )
             
             # Retornamos la información.
             return StreamingResponse(
@@ -323,11 +352,6 @@ class Activos:
                     "Content-Type": "application/pdf",
                 },
             )
-
-
-
-            # Retornamos la información.
-            return self.tools.output(200, "Acta respondida con éxito.")
 
         except CustomException as e:
             raise CustomException(f"{e}")
@@ -416,3 +440,24 @@ class Activos:
 
         except CustomException as e:
             raise CustomException(f"{e}")
+
+    # Función para construir el correo de respuesta
+    def build_correo_respuesta(self, tercero_nombre: str):
+        """ Función que construye el cuerpo del correo de respuesta. """
+
+        body = f"""\
+            <!DOCTYPE html>
+            <html lang="es">
+                <head>
+                    <meta charset="utf-8">
+                    <meta name="x-apple-disable-message-reformatting">
+                    <meta name="viewport" content="width=device-width,initial-scale=1">
+                    <title>Notificación Firma Acta de Activos</title>
+                </head>
+                <body style="margin:0;padding:0;background:#f4f6f8;">
+                    <h4>Buen día le notificamos que el/la usuario/a: {tercero_nombre}</h4>
+                    <p>Ha realizado el proceso de firma del acta de activos de manera exitosa.</p>
+                </body>
+            </html>
+        """
+        return body
