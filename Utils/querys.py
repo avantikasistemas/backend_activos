@@ -288,7 +288,8 @@ class Querys:
 
             # Consultamos los activos en la base de datos
             sql = """
-            SELECT TOP(1) t.nombres, tt.descripcion AS cargo, a.macroproceso, pm.nombre AS macroproceso_nombre
+            SELECT TOP(1) t.nombres, tt.descripcion AS cargo, a.macroproceso, 
+            pm.nombre AS macroproceso_nombre, t.mail
             FROM dbo.intranet_activos a
             LEFT JOIN terceros t ON t.nit = a.tercero
             LEFT JOIN terceros_3 tt ON tt.concepto_3 = t.concepto_3
