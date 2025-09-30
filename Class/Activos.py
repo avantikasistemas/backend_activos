@@ -46,7 +46,7 @@ class Activos:
 
         # Asignamos nuestros datos de entrada a sus respectivas variables
         codigo = data["codigo"]
-        motivo = data["motivo"]
+        # motivo = data["motivo"]
 
         try:
             # Consultamos el activo en la base de datos
@@ -55,11 +55,15 @@ class Activos:
                 raise CustomException("Activo se encuentra retirado.")
 
             # Retiramos el activo
-            self.querys.retirar_activo(codigo, motivo)
+            # self.querys.retirar_activo(codigo, motivo)
+            self.querys.retirar_activo(codigo)
             
+            # mensaje = f"""
+            #     Activo retirado del inventario. \n
+            #     Motivo: {motivo}
+            # """
             mensaje = f"""
-                Activo retirado del inventario. \n
-                Motivo: {motivo}
+                Activo retirado del inventario.
             """
             
             # Guardamos el historial del activo
@@ -461,3 +465,17 @@ class Activos:
             </html>
         """
         return body
+
+    # Función para consultar los activos
+    def consultar_activos(self, data: dict):
+        """ Api que realiza la consulta de los activos. """
+
+        try:
+            # Consultamos los activos en la base de datos
+            activos = self.querys.consultar_activos(data)
+
+            # Retornamos la información.
+            return self.tools.output(200, "Activos encontrados.", activos)
+
+        except CustomException as e:
+            raise CustomException(f"{e}")

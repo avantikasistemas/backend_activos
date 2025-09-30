@@ -115,3 +115,16 @@ class Parametros:
 
         except CustomException as e:
             raise CustomException(f"{e}")
+
+    # Función para obtener los activos por grupo
+    def obtener_activos_x_grupo(self, data):
+        """ Api que realiza la consulta de los activos por grupo. """
+
+        try:
+            activos = self.querys.obtener_activos_x_grupo(data["grupo"])
+
+            # Retornamos la información.
+            return self.tools.output(200, "Datos encontrados.", activos)
+
+        except CustomException as e:
+            raise CustomException(f"{e}")

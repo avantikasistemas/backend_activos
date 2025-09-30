@@ -43,12 +43,12 @@ class Rules:
                 "valor": params["codigo"],
                 "obligatorio": True,
             },
-            {
-                "tipo": "string",
-                "campo": "motivo",
-                "valor": params["motivo"],
-                "obligatorio": True,
-            }
+            # {
+            #     "tipo": "string",
+            #     "campo": "motivo",
+            #     "valor": params["motivo"],
+            #     "obligatorio": True,
+            # }
         ]
         return validacion_dict
 

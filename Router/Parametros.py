@@ -55,3 +55,10 @@ def obtener_macroproceso_x_grupo(request: Request, macro_x_grupo: MacroprocesoXg
     data = getattr(request.state, "json_data", {})
     response = Parametros(db).obtener_macroproceso_x_grupo(data)
     return response
+
+@parametros_router.post('/params/obtener_activos_x_grupo', tags=["Parametros"], response_model=dict)
+@http_decorator
+def obtener_activos_x_grupo(request: Request, macro_x_grupo: MacroprocesoXgrupo, db: Session = Depends(get_db)):
+    data = getattr(request.state, "json_data", {})
+    response = Parametros(db).obtener_activos_x_grupo(data)
+    return response

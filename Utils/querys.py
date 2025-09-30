@@ -114,12 +114,12 @@ class Querys:
             self.db.close()
 
     # Query para retirar un activo
-    def retirar_activo(self, codigo: str, motivo: str):
+    def retirar_activo(self, codigo: str):
         try:
             sql = """
                 UPDATE intranet_activos 
-                SET retirado = 1, estado = 10, motivo_retiro = :motivo, fecha_retiro = GETDATE() WHERE codigo = :codigo;"""
-            self.db.execute(text(sql), {"codigo": codigo, "motivo": motivo})
+                SET retirado = 1, estado = 10, fecha_retiro = GETDATE() WHERE codigo = :codigo;"""
+            self.db.execute(text(sql), {"codigo": codigo})
             self.db.commit()
         except CustomException as e:
             traceback.print_exc()
@@ -187,18 +187,18 @@ class Querys:
     def consultar_historial(self, data: dict):
         try:
             
-            sql = """
-                SELECT id FROM intranet_activos WHERE codigo = :codigo;
-            """
-            activo = self.db.execute(text(sql), data).fetchone()
-            if not activo:
-                raise CustomException("Activo no encontrado.")
+            # sql = """
+            #     SELECT id FROM intranet_activos WHERE codigo = :codigo;
+            # """
+            # activo = self.db.execute(text(sql), data).fetchone()
+            # if not activo:
+            #     raise CustomException("Activo no encontrado.")
 
             sql2 = """
                 SELECT * 
                 FROM intranet_activos_historial 
                 WHERE activo_id = :activo_id AND estado = 1;"""
-            result = self.db.execute(text(sql2), {"activo_id": activo.id}).fetchall()
+            result = self.db.execute(text(sql2), {"activo_id": data['activo_id']}).fetchall()
             data_list = [dict(row._mapping) for row in result] if result else []
             if data_list:
                 for row in data_list:
@@ -460,6 +460,81 @@ class Querys:
             """
             self.db.execute(text(sql), {"pdf_generado_id": pdf_generado_id})
             self.db.commit()
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # query para obtener los activos por grupo
+    def obtener_activos_x_grupo(self, grupo: str):
+        """ Api que realiza la consulta de los activos por grupo. """
+
+        try:
+            sql = """
+            SELECT * FROM intranet_activos WHERE retirado = 0 AND grupo = :grupo
+            """
+            result = self.db.execute(text(sql), {"grupo": grupo}).fetchall()
+            return [dict(row._mapping) for row in result] if result else []
+        except CustomException as e:
+            raise CustomException(f"{e}")
+
+    # Query para consultar los activos según filtros
+    def consultar_activos(self, filters: dict):
+        """ Consulta los activos según los filtros proporcionados. """
+        try:
+            sql = """
+                SELECT ia.*, iae.nombre as estado_descripcion, 
+                ipm.nombre as macroproceso_encargado_nombre,
+                ipm2.nombre as macroproceso_nombre,
+                t.nombres as tercero_nombre, c.descripcion as centro_costo,
+                ag.descripcion as grupo_nombre, ias.nombre as sede_nombre,
+                tp.nombres as proveedor_nombre
+                FROM intranet_activos ia
+                INNER JOIN intranet_activos_estados iae ON iae.id = ia.estado
+                LEFT JOIN intranet_perfiles_macroproceso ipm ON ipm.id = ia.macroproceso_encargado
+                LEFT JOIN intranet_perfiles_macroproceso ipm2 ON ipm2.id = ia.macroproceso
+                LEFT JOIN terceros t ON t.nit = ia.tercero
+                LEFT JOIN terceros tp ON tp.nit = ia.proveedor
+                LEFT JOIN centros c ON c.centro = ia.centro
+                INNER JOIN activos_gru ag ON ag.grupo = ia.grupo
+                LEFT JOIN intranet_activos_sedes ias ON ias.id= ia.sede
+            """
+            params = {}
+
+            if "codigo" in filters and filters["codigo"]:
+                sql += " AND codigo LIKE :codigo"
+                params["codigo"] = f"%{filters['codigo']}%"
+            if "descripcion" in filters and filters["descripcion"]:
+                sql += " AND descripcion LIKE :descripcion"
+                params["descripcion"] = f"%{filters['descripcion']}%"
+            if "estado" in filters and filters["estado"]:
+                sql += " AND estado = :estado"
+                params["estado"] = filters["estado"]
+            if "sede" in filters and filters["sede"]:
+                sql += " AND sede = :sede"
+                params["sede"] = filters["sede"]
+            if "centro" in filters and filters["centro"]:
+                sql += " AND centro = :centro"
+                params["centro"] = filters["centro"]
+            if "grupo" in filters and filters["grupo"]:
+                sql += " AND grupo = :grupo"
+                params["grupo"] = filters["grupo"]
+            if "macroproceso" in filters and filters["macroproceso"]:
+                sql += " AND macroproceso = :macroproceso"
+                params["macroproceso"] = filters["macroproceso"]
+            if "tercero" in filters and filters["tercero"]:
+                sql += " AND tercero = :tercero"
+                params["tercero"] = filters["tercero"]
+
+            result = self.db.execute(text(sql), params).fetchall()
+            data_list = [dict(row._mapping) for row in result] if result else []
+            if data_list:
+                for row in data_list:
+                    for k, v in row.items():
+                        if isinstance(v, datetime):
+                            row[k] = v.strftime('%Y-%m-%d %H:%M:%S')
+            return data_list
+
         except CustomException as e:
             raise CustomException(f"{e}")
         finally:
