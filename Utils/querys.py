@@ -186,13 +186,18 @@ class Querys:
     # Query para consultar el historial de un activo
     def consultar_historial(self, data: dict):
         try:
-            
-            # sql = """
-            #     SELECT id FROM intranet_activos WHERE codigo = :codigo;
-            # """
-            # activo = self.db.execute(text(sql), data).fetchone()
-            # if not activo:
-            #     raise CustomException("Activo no encontrado.")
+            data_activo = dict()
+            sql = """
+                SELECT ia.*, t.nombres as responsable, tt.nombres as proveedor
+                FROM intranet_activos ia
+                LEFT JOIN terceros tt ON tt.nit = ia.proveedor
+                LEFT JOIN terceros t ON t.nit = ia.tercero
+                WHERE ia.id = :id;
+            """
+            activo = self.db.execute(text(sql), {"id": data['activo_id']}).fetchone()
+            if not activo:
+                raise CustomException("Activo no encontrado.")
+            data_activo = dict(activo._mapping)
 
             sql2 = """
                 SELECT * 
@@ -205,7 +210,7 @@ class Querys:
                     for k, v in row.items():
                         if isinstance(v, datetime):
                             row[k] = v.strftime('%Y-%m-%d %H:%M:%S')
-            return data_list
+            return {"info": data_activo, "historial": data_list}
         except CustomException as e:
             traceback.print_exc()
             print(f"Error al consultar historial de activo: {e}")
@@ -535,6 +540,168 @@ class Querys:
                             row[k] = v.strftime('%Y-%m-%d %H:%M:%S')
             return data_list
 
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # query para obtener los tecnicos
+    def obtener_tecnicos(self):
+        """ Api que realiza la consulta los tecnicos asignados. """
+
+        try:
+            sql = """
+            SELECT * FROM dbo.intranet_activos_tecnicos WHERE estado = 1
+            """
+            result = self.db.execute(text(sql)).fetchall()
+            return [dict(row._mapping) for row in result] if result else []
+        except CustomException as e:
+            raise CustomException(f"{e}")
+
+    # Query para guardar una orden de trabajo
+    def guardar_orden_trabajo(self, data: dict):
+        try:
+            sql = """
+                INSERT INTO dbo.intranet_ordenes_trabajo (activo_id, 
+                tipo_mantenimiento, fecha_programacion, tecnico_asignado, 
+                descripcion)
+                OUTPUT INSERTED.id
+                VALUES (:activo_id, :tipo_mantenimiento, :fecha_programacion, 
+                :tecnico_asignado, :descripcion)"""
+            result = self.db.execute(text(sql), data)
+            inserted_id = result.scalar()
+            self.db.commit()
+            return inserted_id
+        except CustomException as e:
+            traceback.print_exc()
+            print(f"Error al guardar activo: {e}")
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Query para obtener el historia de ordenes de trabajo
+    def get_historial_ot(self, activo_id: int):
+        """ Api que realiza la consulta del historial de las ordenes de trabajo. """
+
+        try:
+            sql = """
+                SELECT iot.*,
+                iat.nombre as tecnico, ieot.nombre as estado_ot_nombre,
+                CASE WHEN iot.tipo_mantenimiento = 1 THEN 'Preventivo' WHEN iot.tipo_mantenimiento = 2 THEN 'Correctivo' ELSE '' END AS tipo_mantenimiento_nombre
+                FROM dbo.intranet_ordenes_trabajo iot
+                INNER JOIN intranet_activos_tecnicos iat ON iat.id = iot.tecnico_asignado
+                INNER JOIN intranet_estados_ordenes_trabajo ieot ON ieot.id = iot.estado_ot
+                WHERE iot.activo_id = :activo_id
+                AND iot.estado = 1
+            """
+            result = self.db.execute(text(sql), {"activo_id": activo_id}).fetchall()
+            data_list = [dict(row._mapping) for row in result] if result else []
+            if data_list:
+                for row in data_list:
+                    for k, v in row.items():
+                        if isinstance(v, date):
+                            row[k] = v.strftime('%Y-%m-%d')
+            return data_list
+        except CustomException as e:
+            raise CustomException(f"{e}")
+
+    # Query para consultar los datos de una orden de trabajo
+    def consultar_data_ot(self, ot_id: int):
+        """ Api que realiza la consulta de una orden de trabajo. """
+
+        try:
+            sql = """                
+                select iot.*, ia.descripcion as descripcion_activo, iat.nombre as tecnico, ieot.nombre as estado_ot_nombre,
+                CASE WHEN iot.tipo_mantenimiento = 1 THEN 'Preventivo' WHEN iot.tipo_mantenimiento = 2 THEN 'Correctivo' ELSE '' END AS tipo_mantenimiento_nombre
+                from dbo.intranet_ordenes_trabajo iot
+                inner join intranet_activos ia on ia.id = iot.activo_id
+                INNER JOIN intranet_activos_tecnicos iat ON iat.id = iot.tecnico_asignado
+                INNER JOIN intranet_estados_ordenes_trabajo ieot ON ieot.id = iot.estado_ot
+                where iot.estado = 1 and iot.id = :ot_id
+            """
+            result = self.db.execute(text(sql), {"ot_id": ot_id}).fetchone()
+            if not result:
+                raise CustomException("Orden de trabajo no encontrada.")
+            row = dict(result._mapping)
+            for k, v in row.items():
+                if isinstance(v, date):
+                    row[k] = v.strftime('%Y-%m-%d')
+            return row
+        except CustomException as e:
+            raise CustomException(f"{e}")
+
+    # Query para obtener los estados de las ot
+    def obtener_estados_ot(self):
+        """ Api que realiza la consulta de los estados de la sot. """
+
+        try:
+            sql = """
+            SELECT * FROM dbo.intranet_estados_ordenes_trabajo WHERE estado = 1
+            """
+            result = self.db.execute(text(sql)).fetchall()
+            return [dict(row._mapping) for row in result] if result else []
+        except CustomException as e:
+            raise CustomException(f"{e}")
+
+    # Query para actualizar el estado de una orden de trabajo
+    def actualizar_estado_ot(self, ot_id: int, estado_ot: int):
+        """ Api que actualiza el estado de una orden de trabajo. """
+
+        try:
+            sql = """
+                UPDATE dbo.intranet_ordenes_trabajo
+                SET estado_ot = :estado_ot
+                WHERE id = :ot_id AND estado = 1
+            """
+            result = self.db.execute(text(sql), {"estado_ot": estado_ot, "ot_id": ot_id})
+            if result.rowcount == 0:
+                raise CustomException("Orden de trabajo no encontrada o inactiva.")
+            self.db.commit()
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Query para consultar las actividades de una orden de trabajo
+    def consultar_actividades_ot(self, ot_id: int):
+        """ Api que realiza la consulta de las actividades de una orden de trabajo. """
+
+        try:
+            sql = """
+                SELECT * FROM dbo.intranet_actividades_ordenes_trabajo
+                WHERE orden_trabajo_id = :ot_id AND estado = 1
+            """
+            result = self.db.execute(text(sql), {"ot_id": ot_id}).fetchall()
+            data_list = [dict(row._mapping) for row in result] if result else []
+            if data_list:
+                for row in data_list:
+                    for k, v in row.items():
+                        if isinstance(v, datetime):
+                            row[k] = v.strftime('%Y-%m-%d %H:%M:%S')
+            return data_list
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Query para agregar una actividad a una orden de trabajo
+    def agregar_actividad_ot(self, ot_id: int, descripcion: str, tecnico: str):
+        """ Api que agrega una actividad a una orden de trabajo. """
+
+        try:
+            sql = """
+                INSERT INTO dbo.intranet_actividades_ordenes_trabajo (orden_trabajo_id, descripcion, tecnico)
+                VALUES (:orden_trabajo_id, :descripcion, :tecnico)
+            """
+            self.db.execute(
+                text(sql), 
+                {
+                    "orden_trabajo_id": ot_id, 
+                    "descripcion": descripcion, 
+                    "tecnico": tecnico
+                }
+            )
+            self.db.commit()
         except CustomException as e:
             raise CustomException(f"{e}")
         finally:

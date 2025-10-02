@@ -128,3 +128,29 @@ class Parametros:
 
         except CustomException as e:
             raise CustomException(f"{e}")
+
+    # Función para obtener los tecnicos asignados
+    def obtener_tecnicos(self):
+        """ Api que realiza la consulta de los tecnicos. """
+
+        try:
+            tecnicos = self.querys.obtener_tecnicos()
+
+            # Retornamos la información.
+            return self.tools.output(200, "Datos encontrados.", tecnicos)
+
+        except CustomException as e:
+            raise CustomException(f"{e}")
+
+    # Función para obtener los tecnicos asignados
+    def obtener_estados_ot(self):
+        """ Api que realiza la consulta de los estados de las ot. """
+
+        try:
+            estados_ot = self.querys.obtener_estados_ot()
+
+            # Retornamos la información.
+            return self.tools.output(200, "Datos encontrados.", estados_ot)
+
+        except CustomException as e:
+            raise CustomException(f"{e}")

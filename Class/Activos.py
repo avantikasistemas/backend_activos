@@ -34,8 +34,16 @@ class Activos:
             # Consultamos el activo en la base de datos
             data_activo = self.querys.get_activo(codigo)
             
+            # Consultamos historial de ot si tiene
+            historial_ot = self.querys.get_historial_ot(data_activo["id"])
+            
+            response = {
+                "data_activo": data_activo,
+                "historial_ot": historial_ot,
+            }
+            
             # Retornamos la información.
-            return self.tools.output(200, "Datos encontrados.", data_activo)
+            return self.tools.output(200, "Datos encontrados.", response)
 
         except CustomException as e:
             raise CustomException(f"{e}")

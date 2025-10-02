@@ -14,6 +14,7 @@ class Rules:
             "/guardar_activo": self.__val_guardar_activo,
             "/actualizar_activo": self.__val_actualizar_activo,
             "/responder_acta": self.__val_responder_acta,
+            "/guardar_orden_trabajo": self.__val_guardar_orden_trabajo,
         }
         # Se obtiene la funcion a ejecutar
         func = path_dict.get(path, None)
@@ -294,3 +295,38 @@ class Rules:
                 },
             ]
             return validacion_dict
+
+    def __val_guardar_orden_trabajo(self, params):
+        validacion_dict = [
+            {
+                "tipo": "int",
+                "campo": "activo id",
+                "valor": params["activo_id"],
+                "obligatorio": True,
+            },
+            {
+                "tipo": "int",
+                "campo": "tipo mantenimiento",
+                "valor": params["tipo_mantenimiento"],
+                "obligatorio": True,
+            },
+            {
+                "tipo": "string",
+                "campo": "fecha programacion",
+                "valor": params["fecha_programacion"],
+                "obligatorio": True,
+            },
+            {
+                "tipo": "int",
+                "campo": "tecnico asignado",
+                "valor": params["tecnico_asignado"],
+                "obligatorio": True,
+            },
+            {
+                "tipo": "string",
+                "campo": "descripcion",
+                "valor": params["descripcion"],
+                "obligatorio": True,
+            }
+        ]
+        return validacion_dict
