@@ -74,3 +74,22 @@ def obtener_tecnicos(request: Request, db: Session = Depends(get_db)):
 def obtener_estados_ot(request: Request, db: Session = Depends(get_db)):
     response = Parametros(db).obtener_estados_ot()
     return response
+
+@parametros_router.post('/params/obtener_ot_x_estado', tags=["Parametros"], response_model=dict)
+@http_decorator
+def obtener_ot_x_estado(request: Request, db: Session = Depends(get_db)):
+    data = getattr(request.state, "json_data", {})
+    response = Parametros(db).obtener_ot_x_estado(data)
+    return response
+
+@parametros_router.post('/params/conteo_activos_retirados', tags=["Parametros"], response_model=dict)
+@http_decorator
+def conteo_activos_retirados(request: Request, db: Session = Depends(get_db)):
+    response = Parametros(db).conteo_activos_retirados()
+    return response
+
+@parametros_router.post('/params/conteo_tipos_mantenimiento_ot', tags=["Parametros"], response_model=dict)
+@http_decorator
+def conteo_tipos_mantenimiento_ot(request: Request, db: Session = Depends(get_db)):
+    response = Parametros(db).conteo_tipos_mantenimiento_ot()
+    return response

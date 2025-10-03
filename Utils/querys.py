@@ -749,8 +749,74 @@ class Querys:
             return {"registros": data_list, "cant_registros": cant_registros}
         except CustomException as e:
             raise CustomException(f"{e}")
+        finally:
+            self.db.close()
 
     # Función que arma el limite de paginación
     def obtener_limit(self, limit: int, position: int):
         offset = (position - 1) * limit
         return offset
+
+    # Query para consultar las ordenes de trabajo por estado
+    def obtener_ot_x_estado(self, estado_ot: dict):
+        """ Api que realiza la consulta de las ot por estado. """
+
+        try:
+            sql = """                
+                SELECT COUNT(*) AS total 
+                FROM intranet_ordenes_trabajo 
+                WHERE estado_ot = :estado_ot AND estado = 1
+            """
+
+            result = self.db.execute(text(sql), {"estado_ot": estado_ot}).fetchone()
+
+            return dict(result._mapping)
+
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Query para consultar el conteo de activos retirados
+    def conteo_activos_retirados(self):
+        """ Api que realiza la consulta de los activos retirados. """
+
+        try:
+            sql = """                
+                SELECT retirado, COUNT(*) AS total
+                FROM intranet_activos
+                GROUP BY retirado;
+            """
+
+            result = self.db.execute(text(sql)).fetchall()
+
+            data_list = [dict(row._mapping) for row in result] if result else []
+
+            return data_list
+
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Query para consultar el conteo de tipos de mantenimiento de las ot
+    def conteo_tipos_mantenimiento_ot(self):
+        """ Api que realiza la consulta de los tipos de mantenimiento de las ot. """
+
+        try:
+            sql = """                
+                SELECT tipo_mantenimiento, COUNT(*) AS total
+                FROM intranet_ordenes_trabajo
+                GROUP BY tipo_mantenimiento;
+            """
+
+            result = self.db.execute(text(sql)).fetchall()
+
+            data_list = [dict(row._mapping) for row in result] if result else []
+
+            return data_list
+
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
