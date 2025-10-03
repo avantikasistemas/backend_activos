@@ -33,3 +33,17 @@ def agregar_actividad_ot(request: Request, db: Session = Depends(get_db)):
     data = getattr(request.state, "json_data", {})
     response = OrdenesTrabajo(db).agregar_actividad_ot(data)
     return response
+
+@orden_trabajo_router.post('/guardar_ordenes_masivas', tags=["Ordenes de Trabajo"], response_model=dict)
+@http_decorator
+def guardar_ordenes_masivas(request: Request, db: Session = Depends(get_db)):
+    data = getattr(request.state, "json_data", {})
+    response = OrdenesTrabajo(db).guardar_ordenes_masivas(data)
+    return response
+
+@orden_trabajo_router.post('/consultar_ordenes_trabajo', tags=["Ordenes de Trabajo"], response_model=dict)
+@http_decorator
+def consultar_ordenes_trabajo(request: Request, db: Session = Depends(get_db)):
+    data = getattr(request.state, "json_data", {})
+    response = OrdenesTrabajo(db).consultar_ordenes_trabajo(data)
+    return response

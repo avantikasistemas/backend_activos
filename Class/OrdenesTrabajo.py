@@ -104,3 +104,84 @@ class OrdenesTrabajo:
 
         except CustomException as e:
             raise CustomException(f"{e}")
+
+    def guardar_ordenes_masivas(self, data: dict):
+        """ Api que realiza la creación masiva de órdenes de trabajo. """
+
+        try:
+            grupo = data["grupo"]
+            fecha_programacion_desde = data["fecha_programacion_desde"]
+            fecha_programacion_hasta = data["fecha_programacion_hasta"]
+            tecnico_asignado = data["tecnico_asignado"]
+            descripcion = data["descripcion"]
+            
+            activos_x_grupo = self.querys.obtener_activos_x_grupo(grupo)
+            if activos_x_grupo:
+                for activo in activos_x_grupo:
+                    params = {
+                        "activo_id": activo["id"],
+                        "tipo_mantenimiento": 1,
+                        "fecha_programacion_desde": fecha_programacion_desde,
+                        "fecha_programacion_hasta": fecha_programacion_hasta,
+                        "tecnico_asignado": tecnico_asignado,
+                        "descripcion": descripcion,
+                    }
+                    self.querys.guardar_orden_trabajo(params)
+
+            # Retornamos la información.
+            return self.tools.output(200, "Órdenes de trabajo creadas con éxito.")
+
+        except CustomException as e:
+            raise CustomException(f"{e}")
+
+    # Función para consultar las órdenes de trabajo
+    def consultar_ordenes_trabajo(self, data: dict):
+        """ Api que realiza la consulta de las órdenes de trabajo. """
+
+        try:
+            
+            if data["position"] <= 0:
+                message = "El campo posición no es válido"
+                raise CustomException(message)
+
+            # Consultamos la información de las órdenes de trabajo en la base de datos
+            ordenes_trabajo = self.querys.consultar_ordenes_trabajo(data)
+
+            registros = ordenes_trabajo["registros"]
+            cant_registros = ordenes_trabajo["cant_registros"]
+            
+            if not registros:
+                message = "No hay listado que mostrar."
+                return self.tools.output(200, message, data={
+                "total_registros": 0,
+                "total_pag": 0,
+                "posicion_pag": 0,
+                "registros": []
+            })
+                
+            if cant_registros%data["limit"] == 0:
+                total_pag = cant_registros//data["limit"]
+            else:
+                total_pag = cant_registros//data["limit"] + 1
+                
+            if total_pag < int(data["position"]):
+                message = "La posición excede el número total de registros."
+                return self.tools.output(200, message, data={
+                "total_registros": 0,
+                "total_pag": 0,
+                "posicion_pag": 0,
+                "registros": []
+            })
+                
+            registros_dict = {
+                "total_registros": cant_registros,
+                "total_pag": total_pag,
+                "posicion_pag": data["position"],
+                "registros": registros
+            }
+
+            # Retornamos la información.
+            return self.tools.output(200, "Datos encontrados.", registros_dict)
+
+        except CustomException as e:
+            raise CustomException(f"{e}")

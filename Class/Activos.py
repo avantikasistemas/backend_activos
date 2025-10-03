@@ -479,11 +479,49 @@ class Activos:
         """ Api que realiza la consulta de los activos. """
 
         try:
+            
+            if data["position"] <= 0:
+                message = "El campo posición no es válido"
+                raise CustomException(message)
+            
             # Consultamos los activos en la base de datos
             activos = self.querys.consultar_activos(data)
 
+            registros = activos["registros"]
+            cant_registros = activos["cant_registros"]
+            
+            if not registros:
+                message = "No hay listado que mostrar."
+                return self.tools.output(200, message, data={
+                "total_registros": 0,
+                "total_pag": 0,
+                "posicion_pag": 0,
+                "registros": []
+            })
+                
+            if cant_registros%data["limit"] == 0:
+                total_pag = cant_registros//data["limit"]
+            else:
+                total_pag = cant_registros//data["limit"] + 1
+                
+            if total_pag < int(data["position"]):
+                message = "La posición excede el número total de registros."
+                return self.tools.output(200, message, data={
+                "total_registros": 0,
+                "total_pag": 0,
+                "posicion_pag": 0,
+                "registros": []
+            })
+                
+            registros_dict = {
+                "total_registros": cant_registros,
+                "total_pag": total_pag,
+                "posicion_pag": data["position"],
+                "registros": registros
+            }
+
             # Retornamos la información.
-            return self.tools.output(200, "Activos encontrados.", activos)
+            return self.tools.output(200, "Datos encontrados.", registros_dict)
 
         except CustomException as e:
             raise CustomException(f"{e}")

@@ -484,16 +484,22 @@ class Querys:
             raise CustomException(f"{e}")
 
     # Query para consultar los activos según filtros
-    def consultar_activos(self, filters: dict):
+    def consultar_activos(self, data: dict):
         """ Consulta los activos según los filtros proporcionados. """
         try:
+            
+            cant_registros = 0
+            limit = data["limit"]
+            position = data["position"]
+            filtros = data["filtros"]
+
             sql = """
                 SELECT ia.*, iae.nombre as estado_descripcion, 
                 ipm.nombre as macroproceso_encargado_nombre,
                 ipm2.nombre as macroproceso_nombre,
                 t.nombres as tercero_nombre, c.descripcion as centro_costo,
                 ag.descripcion as grupo_nombre, ias.nombre as sede_nombre,
-                tp.nombres as proveedor_nombre
+                tp.nombres as proveedor_nombre, COUNT(*) OVER() AS total_registros
                 FROM intranet_activos ia
                 INNER JOIN intranet_activos_estados iae ON iae.id = ia.estado
                 LEFT JOIN intranet_perfiles_macroproceso ipm ON ipm.id = ia.macroproceso_encargado
@@ -503,42 +509,29 @@ class Querys:
                 LEFT JOIN centros c ON c.centro = ia.centro
                 INNER JOIN activos_gru ag ON ag.grupo = ia.grupo
                 LEFT JOIN intranet_activos_sedes ias ON ias.id= ia.sede
+                WHERE ia.retirado IN (0,1)
             """
-            params = {}
 
-            if "codigo" in filters and filters["codigo"]:
-                sql += " AND codigo LIKE :codigo"
-                params["codigo"] = f"%{filters['codigo']}%"
-            if "descripcion" in filters and filters["descripcion"]:
-                sql += " AND descripcion LIKE :descripcion"
-                params["descripcion"] = f"%{filters['descripcion']}%"
-            if "estado" in filters and filters["estado"]:
-                sql += " AND estado = :estado"
-                params["estado"] = filters["estado"]
-            if "sede" in filters and filters["sede"]:
-                sql += " AND sede = :sede"
-                params["sede"] = filters["sede"]
-            if "centro" in filters and filters["centro"]:
-                sql += " AND centro = :centro"
-                params["centro"] = filters["centro"]
-            if "grupo" in filters and filters["grupo"]:
-                sql += " AND grupo = :grupo"
-                params["grupo"] = filters["grupo"]
-            if "macroproceso" in filters and filters["macroproceso"]:
-                sql += " AND macroproceso = :macroproceso"
-                params["macroproceso"] = filters["macroproceso"]
-            if "tercero" in filters and filters["tercero"]:
-                sql += " AND tercero = :tercero"
-                params["tercero"] = filters["tercero"]
+            if "codigo" in filtros and filtros["codigo"]:
+                sql += " AND ia.codigo LIKE :codigo"
+                self.query_params["codigo"] = f"%{filtros['codigo']}%"
 
-            result = self.db.execute(text(sql), params).fetchall()
+            new_offset = self.obtener_limit(limit, position)
+            self.query_params.update({"offset": new_offset, "limit": limit})
+            sql = sql + " ORDER BY ia.id ASC OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY;"
+            
+            if self.query_params:
+                result = self.db.execute(text(sql), self.query_params).fetchall()
+            else:
+                result = self.db.execute(text(sql)).fetchall()
             data_list = [dict(row._mapping) for row in result] if result else []
             if data_list:
+                cant_registros = data_list[0]['total_registros']
                 for row in data_list:
                     for k, v in row.items():
                         if isinstance(v, datetime):
                             row[k] = v.strftime('%Y-%m-%d %H:%M:%S')
-            return data_list
+            return {"registros": data_list, "cant_registros": cant_registros}
 
         except CustomException as e:
             raise CustomException(f"{e}")
@@ -563,12 +556,22 @@ class Querys:
         try:
             sql = """
                 INSERT INTO dbo.intranet_ordenes_trabajo (activo_id, 
-                tipo_mantenimiento, fecha_programacion, tecnico_asignado, 
-                descripcion)
+                tipo_mantenimiento, fecha_programacion_desde, fecha_programacion_hasta, 
+                tecnico_asignado, descripcion)
                 OUTPUT INSERTED.id
-                VALUES (:activo_id, :tipo_mantenimiento, :fecha_programacion, 
-                :tecnico_asignado, :descripcion)"""
-            result = self.db.execute(text(sql), data)
+                VALUES (:activo_id, :tipo_mantenimiento, :fecha_programacion_desde,
+                :fecha_programacion_hasta, :tecnico_asignado, :descripcion)"""
+            result = self.db.execute(
+                text(sql),
+                {
+                    "activo_id": data["activo_id"],
+                    "tipo_mantenimiento": data["tipo_mantenimiento"],
+                    "fecha_programacion_desde": data["fecha_programacion_desde"],
+                    "fecha_programacion_hasta": data.get("fecha_programacion_hasta") if data.get("fecha_programacion_hasta") else data["fecha_programacion_desde"],
+                    "tecnico_asignado": data["tecnico_asignado"],
+                    "descripcion": data.get("descripcion"),        
+                }
+            )
             inserted_id = result.scalar()
             self.db.commit()
             return inserted_id
@@ -706,3 +709,48 @@ class Querys:
             raise CustomException(f"{e}")
         finally:
             self.db.close()
+
+    # Query para consultar las ordenes de trabajo
+    def consultar_ordenes_trabajo(self, data: dict):
+        """ Api que realiza la consulta de las ordenes de trabajo. """
+
+        try:
+            cant_registros = 0
+            limit = data["limit"]
+            position = data["position"]
+
+            sql = """                
+                select iot.*, ia.descripcion as descripcion_activo, iat.nombre as tecnico, ieot.nombre as estado_ot_nombre,
+                CASE WHEN iot.tipo_mantenimiento = 1 THEN 'Preventivo' WHEN iot.tipo_mantenimiento = 2 THEN 'Correctivo' ELSE '' END AS tipo_mantenimiento_nombre,
+                COUNT(*) OVER() AS total_registros
+                from dbo.intranet_ordenes_trabajo iot
+                inner join intranet_activos ia on ia.id = iot.activo_id
+                INNER JOIN intranet_activos_tecnicos iat ON iat.id = iot.tecnico_asignado
+                INNER JOIN intranet_estados_ordenes_trabajo ieot ON ieot.id = iot.estado_ot
+                where iot.estado = 1
+            """
+
+            new_offset = self.obtener_limit(limit, position)
+            self.query_params.update({"offset": new_offset, "limit": limit})
+            sql = sql + " ORDER BY iot.id ASC OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY;"
+            
+            if self.query_params:
+                result = self.db.execute(text(sql), self.query_params).fetchall()
+            else:
+                result = self.db.execute(text(sql)).fetchall()
+
+            data_list = [dict(row._mapping) for row in result] if result else []
+            if data_list:
+                cant_registros = data_list[0]['total_registros']
+                for row in data_list:
+                    for k, v in row.items():
+                        if isinstance(v, date):
+                            row[k] = v.strftime('%Y-%m-%d')
+            return {"registros": data_list, "cant_registros": cant_registros}
+        except CustomException as e:
+            raise CustomException(f"{e}")
+
+    # Función que arma el limite de paginación
+    def obtener_limit(self, limit: int, position: int):
+        offset = (position - 1) * limit
+        return offset

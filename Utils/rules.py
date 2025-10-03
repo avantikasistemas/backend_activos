@@ -312,9 +312,15 @@ class Rules:
             },
             {
                 "tipo": "string",
-                "campo": "fecha programacion",
-                "valor": params["fecha_programacion"],
+                "campo": "fecha programacion desde",
+                "valor": params["fecha_programacion_desde"],
                 "obligatorio": True,
+            },
+            {
+                "tipo": "string",
+                "campo": "fecha programacion hasta",
+                "valor": params["fecha_programacion_hasta"],
+                "obligatorio": False,
             },
             {
                 "tipo": "int",
