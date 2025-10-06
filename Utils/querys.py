@@ -615,7 +615,8 @@ class Querys:
         try:
             sql = """                
                 select iot.*, ia.descripcion as descripcion_activo, iat.nombre as tecnico, ieot.nombre as estado_ot_nombre,
-                CASE WHEN iot.tipo_mantenimiento = 1 THEN 'Preventivo' WHEN iot.tipo_mantenimiento = 2 THEN 'Correctivo' ELSE '' END AS tipo_mantenimiento_nombre
+                CASE WHEN iot.tipo_mantenimiento = 1 THEN 'Preventivo' WHEN iot.tipo_mantenimiento = 2 THEN 'Correctivo' ELSE '' END AS tipo_mantenimiento_nombre,
+                ia.codigo
                 from dbo.intranet_ordenes_trabajo iot
                 inner join intranet_activos ia on ia.id = iot.activo_id
                 INNER JOIN intranet_activos_tecnicos iat ON iat.id = iot.tecnico_asignado
@@ -722,7 +723,7 @@ class Querys:
             sql = """                
                 select iot.*, ia.descripcion as descripcion_activo, iat.nombre as tecnico, ieot.nombre as estado_ot_nombre,
                 CASE WHEN iot.tipo_mantenimiento = 1 THEN 'Preventivo' WHEN iot.tipo_mantenimiento = 2 THEN 'Correctivo' ELSE '' END AS tipo_mantenimiento_nombre,
-                COUNT(*) OVER() AS total_registros
+                COUNT(*) OVER() AS total_registros, ia.codigo
                 from dbo.intranet_ordenes_trabajo iot
                 inner join intranet_activos ia on ia.id = iot.activo_id
                 INNER JOIN intranet_activos_tecnicos iat ON iat.id = iot.tecnico_asignado
