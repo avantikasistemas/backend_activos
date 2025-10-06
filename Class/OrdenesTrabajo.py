@@ -60,28 +60,6 @@ class OrdenesTrabajo:
         except CustomException as e:
             raise CustomException(f"{e}")
 
-    # Función para actualizar el estado de una orden de trabajo
-    def actualizar_estado_ot(self, data: dict):
-        """ Api que actualiza el estado de una orden de trabajo. """
-
-        try:
-            ot_id = data["ot_id"]
-            estado_ot = data["estado"]
-            if not estado_ot:
-                raise CustomException("El estado es obligatorio.")
-
-            # Consultamos la información de la orden de trabajo en la base de datos
-            self.querys.actualizar_estado_ot(ot_id, estado_ot)
-
-            # Retornamos la información.
-            return self.tools.output(
-                200, 
-                f"La orden de trabajo #{ot_id} ha cambiado de estado."
-            )
-
-        except CustomException as e:
-            raise CustomException(f"{e}")
-
     # Función para agregar una actividad a una orden de trabajo
     def agregar_actividad_ot(self, data: dict):
         """ Api que agrega una actividad a una orden de trabajo. """
@@ -90,17 +68,23 @@ class OrdenesTrabajo:
             ot_id = data["ot_id"]
             descripcion = data["descripcion"]
             tecnico = data["tecnico"]
+            estado = data["estado"]
 
             if not ot_id:
                 raise CustomException("El ID de la orden de trabajo es obligatorio.")
             if not descripcion:
                 raise CustomException("La descripción es obligatoria.")
+            if not estado:
+                raise CustomException("El estado es obligatorio.")
 
             # Agregamos la actividad a la orden de trabajo en la base de datos
             self.querys.agregar_actividad_ot(ot_id, descripcion, tecnico)
+            
+            # Consultamos la información de la orden de trabajo en la base de datos
+            self.querys.actualizar_estado_ot(ot_id, estado)
 
             # Retornamos la información.
-            return self.tools.output(200, f"Actividad agregada con éxito.")
+            return self.tools.output(200, "Actividad agregada con éxito.")
 
         except CustomException as e:
             raise CustomException(f"{e}")

@@ -727,7 +727,7 @@ class Querys:
                 inner join intranet_activos ia on ia.id = iot.activo_id
                 INNER JOIN intranet_activos_tecnicos iat ON iat.id = iot.tecnico_asignado
                 INNER JOIN intranet_estados_ordenes_trabajo ieot ON ieot.id = iot.estado_ot
-                where iot.estado = 1
+                where iot.estado = 1 AND ieot.id IN (1,2)
             """
 
             new_offset = self.obtener_limit(limit, position)

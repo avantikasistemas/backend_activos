@@ -20,13 +20,6 @@ def consultar_data_ot(request: Request, db: Session = Depends(get_db)):
     response = OrdenesTrabajo(db).consultar_data_ot(data)
     return response
 
-@orden_trabajo_router.post('/actualizar_estado_ot', tags=["Ordenes de Trabajo"], response_model=dict)
-@http_decorator
-def actualizar_estado_ot(request: Request, db: Session = Depends(get_db)):
-    data = getattr(request.state, "json_data", {})
-    response = OrdenesTrabajo(db).actualizar_estado_ot(data)
-    return response
-
 @orden_trabajo_router.post('/agregar_actividad_ot', tags=["Ordenes de Trabajo"], response_model=dict)
 @http_decorator
 def agregar_actividad_ot(request: Request, db: Session = Depends(get_db)):
