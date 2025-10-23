@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: https://github.com/avantikasistemas/backend_activos.git#master
+      dockerfile: Dockerfile
+    container_name: activos-backend
+    ports:
+      - "8006:8006"
+    environment:
+      - DRIVER=${DRIVER}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - ENCRYPT=${ENCRYPT}
+      - TRUST_CERTIFICATE=${TRUST_CERTIFICATE}
+      - MY_SECRET_KEY=${MY_SECRET_KEY}
+    volumes:
+      - uploads-data:/app/Uploads
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: https://github.com/avantikasistemas/frontend_nuevo_activos.git#master
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://130.1.1.7:8006
+    container_name: activos-frontend
+    ports:
+      - "5178:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  uploads-data:
+    driver: local
