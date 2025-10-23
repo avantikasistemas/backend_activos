@@ -38,6 +38,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copiar código
 COPY . .
 
+# Crear carpeta Uploads si no existe
+RUN mkdir -p /app/Uploads
+
 # Exponer puerto
 EXPOSE 8006
 
