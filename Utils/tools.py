@@ -417,6 +417,34 @@ class Tools:
                 pdf.drawString(left_margin, y, linea)
                 y -= line_height
 
+        # Imagen de pie de página (centrada, arriba de las firmas)
+        pie_pagina = "Assets/img/pie_de_pagina.png"
+        try:
+            img_pie = ImageReader(pie_pagina)
+            iw_pie, ih_pie = img_pie.getSize()
+            
+            # Dimensiones máximas para el pie de página
+            max_w_pie = 500.0  # ancho máximo
+            max_h_pie = 60.0   # alto máximo
+            
+            # Calcular escala manteniendo proporción
+            scale_pie = min(max_w_pie / float(iw_pie), max_h_pie / float(ih_pie))
+            tw_pie = iw_pie * scale_pie
+            th_pie = ih_pie * scale_pie
+            
+            # Centrar horizontalmente
+            x_pie = (width - tw_pie) / 2
+            y_pie = 210  # posición vertical (arriba de las firmas)
+            
+            pdf.drawImage(
+                img_pie, x_pie, y_pie,
+                width=tw_pie, height=th_pie,
+                preserveAspectRatio=True, mask='auto'
+            )
+        except Exception as e:
+            pdf.setFont("Helvetica-Oblique", 8)
+            pdf.drawString(left_margin, 170, f"[No se pudo cargar pie de página: {e}]")
+
         # Firmas (dos imágenes: creador a la izquierda y file_path a la derecha)
         # Rutas y parámetros base
         firma_creador = "Assets/firmas/firma_creador.jpg"
