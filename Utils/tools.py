@@ -417,33 +417,33 @@ class Tools:
                 pdf.drawString(left_margin, y, linea)
                 y -= line_height
 
-        # Imagen de pie de página (centrada, arriba de las firmas)
-        pie_pagina = "Assets/img/pie_de_pagina.png"
-        try:
-            img_pie = ImageReader(pie_pagina)
-            iw_pie, ih_pie = img_pie.getSize()
-            
-            # Dimensiones máximas para el pie de página
-            max_w_pie = 500.0  # ancho máximo
-            max_h_pie = 60.0   # alto máximo
-            
-            # Calcular escala manteniendo proporción
-            scale_pie = min(max_w_pie / float(iw_pie), max_h_pie / float(ih_pie))
-            tw_pie = iw_pie * scale_pie
-            th_pie = ih_pie * scale_pie
-            
-            # Centrar horizontalmente
-            x_pie = (width - tw_pie) / 2
-            y_pie = 210  # posición vertical (arriba de las firmas)
-            
-            pdf.drawImage(
-                img_pie, x_pie, y_pie,
-                width=tw_pie, height=th_pie,
-                preserveAspectRatio=True, mask='auto'
-            )
-        except Exception as e:
-            pdf.setFont("Helvetica-Oblique", 8)
-            pdf.drawString(left_margin, 170, f"[No se pudo cargar pie de página: {e}]")
+        # Texto de responsabilidad (centrado, arriba de las firmas)
+        y_texto = 210  # posición vertical (arriba de las firmas)
+        pdf.setFont("Helvetica-Bold", 11)
+        pdf.drawString(left_margin, y_texto + 55, "El trabajador manifiesta que:")
+        
+        # Texto de responsabilidad
+        texto_responsabilidad = (
+            "Los recursos relacionados en el presente documento son y serán siempre de la empresa y están bajo mi "
+            "responsabilidad, por lo cual les daré un uso adecuado en el desempeño de mis funciones y a la destinación "
+            "prevista para cada uno de ellos. Me comprometo a informar cualquier tipo de traslado, modificación o daño que "
+            "este pueda tener, dado que la omisión de estas disposiciones es considerada como falta al reglamento interno "
+            "de trabajo. Autorizo expresamente a la empresa mediante este documento a descontar de salarios y liquidación "
+            "de prestaciones los valores de los recursos cuando por uso inadecuado o negligencia se alteren o no se "
+            "devuelvan al empleador."
+        )
+        
+        # Configuración para el texto envuelto
+        pdf.setFont("Helvetica", 10)
+        max_text_width = width - left_margin - 60  # ancho disponible (margen derecho de 60)
+        line_height = 10
+        y_current = y_texto + 40
+        
+        # Envolver y dibujar el texto línea por línea
+        wrapped_lines = textwrap.wrap(texto_responsabilidad, width=120)  # aprox. 120 caracteres por línea
+        for line in wrapped_lines:
+            pdf.drawString(left_margin, y_current, line)
+            y_current -= line_height
 
         # Firmas (dos imágenes: creador a la izquierda y file_path a la derecha)
         # Rutas y parámetros base
