@@ -9,10 +9,7 @@ from dotenv import load_dotenv
 # from email import encoders
 # import json
 import os
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.image import MIMEImage
+import requests
 import pytz
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -30,9 +27,6 @@ from PIL import Image
 
 # Cargar variables de entorno
 load_dotenv()
-
-SMTP_SERVER = os.getenv("SMTP_SERVER")
-SMTP_PORT = int(os.getenv("SMTP_PORT", 25))
 
 class Tools:
 
@@ -108,35 +102,55 @@ class Tools:
         valor_decimal = Decimal(value)
         return valor_decimal
 
-    # Función para enviar correos electrónicos
-    def send_email_individual(self, to_email, cc_emails, subject, body, logo_path=None, mail_sender=None):
-        """Envía un correo electrónico a un destinatario con copia a otros y adjunta un logo si está disponible."""
+    # Función para enviar correos electrónicos vía Microsoft Graph
+    def send_email_individual(self, to_email, cc_emails, subject, body, logo_path=None, mail_sender=None, credentials=None):
+        """Envía un correo electrónico usando Microsoft Graph API."""
 
-        msg = MIMEMultipart()
-        msg['From'] = mail_sender
-        msg['To'] = to_email
-        msg['Cc'] = ", ".join(cc_emails) if cc_emails else ""
-        msg['Subject'] = subject
+        if not credentials:
+            raise Exception("Se requieren las credenciales de Microsoft Graph para enviar correos.")
 
-        # Agregar el contenido HTML
-        msg.attach(MIMEText(body, 'html'))
-        
-        # Adjuntar el logo si está disponible
-        if logo_path:
-            try:
-                with open(logo_path, 'rb') as img:
-                    logo = MIMEImage(img.read())
-                    logo.add_header('Content-ID', '<company_logo>')
-                    msg.attach(logo)
-            except Exception as e:
-                print(f"Error adjuntando el logo: {e}")
-        
-        try:
-            with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-                server.sendmail(mail_sender, [to_email] + cc_emails, msg.as_string())
-            print(f"Correo enviado a {to_email} con copia a {', '.join(cc_emails)}")
-        except Exception as ex:
-            print(f"Error al enviar correo a {to_email}: {ex}")
+        client_id     = credentials.get("MICROSOFT_CLIENT_ID")
+        client_secret = credentials.get("MICROSOFT_CLIENT_SECRET")
+        tenant_id     = credentials.get("MICROSOFT_TENANT_ID")
+        ms_url        = credentials.get("MICROSOFT_URL", "https://login.microsoftonline.com/")
+        graph_url     = credentials.get("MICROSOFT_URL_GRAPH", "https://graph.microsoft.com/v1.0/users/")
+
+        # 1. Obtener el token de acceso (Client Credentials Flow)
+        token_url = f"{ms_url}{tenant_id}/oauth2/v2.0/token"
+        token_response = requests.post(token_url, data={
+            "grant_type":    "client_credentials",
+            "client_id":     client_id,
+            "client_secret": client_secret,
+            "scope":         "https://graph.microsoft.com/.default",
+        })
+        token_response.raise_for_status()
+        access_token = token_response.json()["access_token"]
+
+        # 2. Construir y enviar el correo
+        send_url = f"{graph_url}{mail_sender}/sendMail"
+        headers  = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type":  "application/json",
+        }
+        email_payload = {
+            "message": {
+                "subject": subject,
+                "body": {
+                    "contentType": "HTML",
+                    "content":     body,
+                },
+                "toRecipients": [
+                    {"emailAddress": {"address": to_email}}
+                ],
+                "ccRecipients": [
+                    {"emailAddress": {"address": cc}} for cc in cc_emails
+                ],
+            },
+            "saveToSentItems": "true",
+        }
+        send_response = requests.post(send_url, headers=headers, json=email_payload)
+        send_response.raise_for_status()
+        print(f"Correo enviado a {to_email} con copia a {', '.join(cc_emails)}")
 
     # Función para generar un mensaje de cambios
     def generar_mensaje_cambios(self, payload, data_activo):

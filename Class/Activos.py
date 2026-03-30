@@ -254,6 +254,9 @@ class Activos:
 
             body_correo = self.build_correo(data_link["link_pdf"], data_tercero)
 
+            # Obtenemos las credenciales de Graph
+            graph_credentials = self.querys.get_graph_credenciales()
+
             # Enviamos el correo
             self.tools.send_email_individual(
                 to_email=correo_destino,
@@ -261,7 +264,8 @@ class Activos:
                 subject="Acta de Activos - Avantika",
                 body=body_correo,
                 logo_path=None,
-                mail_sender="auxiliartic@avantika.com.co"
+                mail_sender="auxiliartic@avantika.com.co",
+                credentials=graph_credentials
             )
 
             # Retornamos la información.
@@ -346,6 +350,9 @@ class Activos:
             # Obtenemos el correo del tercero
             correo_tercero = data_tercero["mail"]
 
+            # Obtenemos las credenciales de Graph
+            graph_credentials = self.querys.get_graph_credenciales()
+
             # Enviamos el correo
             self.tools.send_email_individual(
                 to_email="auxiliartic@avantika.com.co",
@@ -353,7 +360,8 @@ class Activos:
                 subject="Acta Final de Activos - Avantika",
                 body=body_correo,
                 logo_path=None,
-                mail_sender=correo_tercero
+                mail_sender=correo_tercero,
+                credentials=graph_credentials
             )
             
             # Retornamos la información.

@@ -821,3 +821,15 @@ class Querys:
             raise CustomException(f"{e}")
         finally:
             self.db.close()
+
+    # Query para obtener las credenciales de Microsoft Graph
+    def get_graph_credenciales(self):
+        """ Obtiene las credenciales de Microsoft Graph desde la base de datos. """
+        try:
+            sql = """ SELECT nombre, valor FROM intranet_graph_credenciales WHERE estado = 1 """
+            result = self.db.execute(text(sql)).fetchall()
+            return {row.nombre: row.valor for row in result} if result else {}
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
