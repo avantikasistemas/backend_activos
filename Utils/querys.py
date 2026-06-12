@@ -596,6 +596,7 @@ class Querys:
                 INNER JOIN intranet_estados_ordenes_trabajo ieot ON ieot.id = iot.estado_ot
                 WHERE iot.activo_id = :activo_id
                 AND iot.estado = 1
+                ORDER BY iot.created_at ASC
             """
             result = self.db.execute(text(sql), {"activo_id": activo_id}).fetchall()
             data_list = [dict(row._mapping) for row in result] if result else []
