@@ -1,6 +1,7 @@
 from Utils.tools import Tools, CustomException
 from Utils.querys import Querys
-from datetime import datetime
+from datetime import datetime, date
+import calendar
 from fastapi.responses import StreamingResponse
 import io
 from io import BytesIO
@@ -22,6 +23,37 @@ class Activos:
         self.db = db
         self.tools = Tools()
         self.querys = Querys(self.db)
+
+    GRUPOS_CON_OT_AUTOMATICA = {"13", "16"}
+    GRUPO_SERVIDORES = "16"
+    TECNICO_DEFAULT_PREVENTIVO = 1
+
+    def _resumen_gsc(self) -> str:
+        now = datetime.now()
+        hora = str(now.hour % 12 or 12)
+        ampm = 'a.m.' if now.hour < 12 else 'p.m.'
+        return f"Registro MNT - {now.day}/{now.month}/{now.year}, {hora}:{now.minute:02d}:{now.second:02d} {ampm}"
+
+    def _fecha_primer_mantenimiento(self, fecha_compra: str):
+        """Calcula las fechas de la primera OT preventiva según la fecha de compra.
+        Meses 1-2  (Ene-Feb)  → Marzo  del mismo año.
+        Meses 3-8  (Mar-Ago)  → Septiembre del mismo año.
+        Meses 9-12 (Sep-Dic)  → Marzo del año siguiente."""
+        fecha = datetime.strptime(fecha_compra, '%Y-%m-%d').date()
+        mes, año = fecha.month, fecha.year
+
+        if mes <= 2:
+            sig_mes, sig_año = 3, año
+        elif mes <= 8:
+            sig_mes, sig_año = 9, año
+        else:
+            sig_mes, sig_año = 3, año + 1
+
+        ultimo_dia = calendar.monthrange(sig_año, sig_mes)[1]
+        return (
+            date(sig_año, sig_mes, 1).strftime('%Y-%m-%d'),
+            date(sig_año, sig_mes, ultimo_dia).strftime('%Y-%m-%d'),
+        )
 
     # Función para consultar un activo
     def consultar_activo(self, data: dict):
@@ -52,9 +84,7 @@ class Activos:
     def retirar_activo(self, data: dict, hostname: str):
         """ Api que realiza el retiro de un activo. """
 
-        # Asignamos nuestros datos de entrada a sus respectivas variables
         codigo = data["codigo"]
-        # motivo = data["motivo"]
 
         try:
             # Consultamos el activo en la base de datos
@@ -62,22 +92,23 @@ class Activos:
             if data_activo["retirado"] == 1:
                 raise CustomException("Activo se encuentra retirado.")
 
+            # Cancelar OTs pendientes (1) o en proceso (2) antes de retirar
+            ots_activas = self.querys.get_ots_activas_por_activo(data_activo["id"])
+            for ot in ots_activas:
+                self.querys.actualizar_estado_ot(ot["id"], 4)
+                self.querys.agregar_actividad_ot(
+                    ot["id"],
+                    "OT cancelada automáticamente por retiro del activo del inventario.",
+                    ot["tecnico"]
+                )
+
             # Retiramos el activo
-            # self.querys.retirar_activo(codigo, motivo)
             self.querys.retirar_activo(codigo)
-            
-            # mensaje = f"""
-            #     Activo retirado del inventario. \n
-            #     Motivo: {motivo}
-            # """
-            mensaje = f"""
-                Activo retirado del inventario.
-            """
-            
+
             # Guardamos el historial del activo
             self.querys.guardar_historial({
                 "activo_id": data_activo["id"],
-                "descripcion": mensaje,
+                "descripcion": "Activo retirado del inventario.",
                 "usuario": hostname
             })
 
@@ -101,6 +132,23 @@ class Activos:
                 "descripcion": "Activo registrado en el sistema.",
                 "usuario": hostname
             })
+
+            # Si el activo pertenece a un grupo con mantenimiento programado,
+            # creamos automáticamente la primera OT preventiva pendiente.
+            grupo_str = str(data.get("grupo", ""))
+            if grupo_str in self.GRUPOS_CON_OT_AUTOMATICA and data.get("fecha_compra"):
+                fecha_desde, fecha_hasta = self._fecha_primer_mantenimiento(data["fecha_compra"])
+                self.querys.guardar_orden_trabajo({
+                    "activo_id": activo_id,
+                    "tipo_mantenimiento": 1,
+                    "fecha_programacion_desde": fecha_desde,
+                    "fecha_programacion_hasta": fecha_hasta,
+                    "tecnico_asignado": self.TECNICO_DEFAULT_PREVENTIVO,
+                    "descripcion": "Mantenimiento preventivo programado automáticamente.",
+                })
+                # Si además es del grupo de servidores, registrar el mantenimiento en GSC
+                if grupo_str == self.GRUPO_SERVIDORES:
+                    self.querys.insertar_gsc_registro(self._resumen_gsc())
 
             # Retornamos la información.
             return self.tools.output(200, "Activo guardado con éxito.")

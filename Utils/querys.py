@@ -596,7 +596,7 @@ class Querys:
                 INNER JOIN intranet_estados_ordenes_trabajo ieot ON ieot.id = iot.estado_ot
                 WHERE iot.activo_id = :activo_id
                 AND iot.estado = 1
-                ORDER BY iot.created_at ASC
+                ORDER BY iot.fecha_programacion_desde ASC
             """
             result = self.db.execute(text(sql), {"activo_id": activo_id}).fetchall()
             data_list = [dict(row._mapping) for row in result] if result else []
@@ -830,6 +830,46 @@ class Querys:
             sql = """ SELECT nombre, valor FROM intranet_graph_credenciales WHERE estado = 1 """
             result = self.db.execute(text(sql)).fetchall()
             return {row.nombre: row.valor for row in result} if result else {}
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Query para obtener OTs pendientes o en proceso de un activo
+    def get_ots_activas_por_activo(self, activo_id: int):
+        try:
+            sql = """
+                SELECT iot.id, iat.nombre AS tecnico
+                FROM dbo.intranet_ordenes_trabajo iot
+                INNER JOIN intranet_activos_tecnicos iat ON iat.id = iot.tecnico_asignado
+                WHERE iot.activo_id = :activo_id AND iot.estado_ot IN (1, 2) AND iot.estado = 1
+            """
+            result = self.db.execute(text(sql), {"activo_id": activo_id}).fetchall()
+            return [dict(row._mapping) for row in result] if result else []
+        except Exception as e:
+            raise CustomException(f"{e}")
+
+    # Query para obtener el grupo de un activo por su ID
+    def get_grupo_activo(self, activo_id: int):
+        try:
+            sql = """ SELECT grupo FROM intranet_activos WHERE id = :activo_id """
+            result = self.db.execute(text(sql), {"activo_id": activo_id}).fetchone()
+            return result.grupo if result else None
+        except Exception:
+            return None
+
+    # Query para insertar un registro en Gestión TIC GSC
+    def insertar_gsc_registro(self, resumen: str):
+        try:
+            sql = """
+                INSERT INTO dbo.intranet_gsc_registros
+                (id_modulo, resumen, id_estado, activo, notificar_gerencia,
+                 enviar_contactos_empresa, fecha_creacion, fecha_actualizacion,
+                 created_at, updated_at)
+                VALUES (3, :resumen, 1, 1, 0, 0, GETDATE(), GETDATE(), GETDATE(), GETDATE())
+            """
+            self.db.execute(text(sql), {"resumen": resumen})
+            self.db.commit()
         except CustomException as e:
             raise CustomException(f"{e}")
         finally:

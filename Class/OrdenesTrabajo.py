@@ -1,6 +1,7 @@
 from Utils.tools import Tools, CustomException
 from Utils.querys import Querys
-from datetime import datetime
+from datetime import datetime, date
+import calendar
 from fastapi.responses import StreamingResponse
 import io
 from io import BytesIO
@@ -31,6 +32,12 @@ class OrdenesTrabajo:
             # Creamos la orden de trabajo en la base de datos
             orden_trabajo_id = self.querys.guardar_orden_trabajo(data)
 
+            # Si es preventivo y el activo pertenece al grupo de servidores, registrar en GSC
+            if data.get("tipo_mantenimiento") in (1, 2):
+                grupo = self.querys.get_grupo_activo(data["activo_id"])
+                if str(grupo) == self.GRUPO_SERVIDORES:
+                    self.querys.insertar_gsc_registro(self._resumen_gsc())
+
             # Retornamos la información.
             return self.tools.output(200, "Orden de trabajo creada con éxito.")
 
@@ -60,6 +67,33 @@ class OrdenesTrabajo:
         except CustomException as e:
             raise CustomException(f"{e}")
 
+    GRUPO_SERVIDORES = "16"
+
+    def _resumen_gsc(self) -> str:
+        now = datetime.now()
+        hora = str(now.hour % 12 or 12)
+        ampm = 'a.m.' if now.hour < 12 else 'p.m.'
+        return f"Registro MNT - {now.day}/{now.month}/{now.year}, {hora}:{now.minute:02d}:{now.second:02d} {ampm}"
+
+    def _siguiente_fecha_ciclo(self, fecha_desde: str):
+        """Calcula las fechas de la siguiente OT en el ciclo marzo/septiembre.
+        Marzo -> Septiembre del mismo año. Septiembre -> Marzo del año siguiente."""
+        fecha = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+        mes, año = fecha.month, fecha.year
+
+        if mes == 9:
+            sig_año, sig_mes = año + 1, 3
+        elif mes == 3:
+            sig_año, sig_mes = año, 9
+        else:
+            return None
+
+        ultimo_dia = calendar.monthrange(sig_año, sig_mes)[1]
+        return (
+            date(sig_año, sig_mes, 1).strftime('%Y-%m-%d'),
+            date(sig_año, sig_mes, ultimo_dia).strftime('%Y-%m-%d'),
+        )
+
     # Función para agregar una actividad a una orden de trabajo
     def agregar_actividad_ot(self, data: dict):
         """ Api que agrega una actividad a una orden de trabajo. """
@@ -79,9 +113,31 @@ class OrdenesTrabajo:
 
             # Agregamos la actividad a la orden de trabajo en la base de datos
             self.querys.agregar_actividad_ot(ot_id, descripcion, tecnico)
-            
-            # Consultamos la información de la orden de trabajo en la base de datos
+
+            # Actualizamos el estado de la orden de trabajo
             self.querys.actualizar_estado_ot(ot_id, estado)
+
+            # Si la OT quedó completada, creamos la siguiente OT programada
+            ESTADO_COMPLETADO = 3
+            if int(estado) == ESTADO_COMPLETADO:
+                ot_data = self.querys.consultar_data_ot(ot_id)
+                siguiente = self._siguiente_fecha_ciclo(ot_data["fecha_programacion_desde"])
+                if siguiente:
+                    fecha_desde, fecha_hasta = siguiente
+                    nueva_ot_params = {
+                        "activo_id": ot_data["activo_id"],
+                        "tipo_mantenimiento": ot_data["tipo_mantenimiento"],
+                        "fecha_programacion_desde": fecha_desde,
+                        "fecha_programacion_hasta": fecha_hasta,
+                        "tecnico_asignado": ot_data["tecnico_asignado"],
+                        "descripcion": ot_data["descripcion"],
+                    }
+                    self.querys.guardar_orden_trabajo(nueva_ot_params)
+                    # Si la nueva OT es preventiva y el activo es del grupo de servidores, registrar en GSC
+                    if nueva_ot_params["tipo_mantenimiento"] == 1:
+                        grupo = self.querys.get_grupo_activo(ot_data["activo_id"])
+                        if str(grupo) == self.GRUPO_SERVIDORES:
+                            self.querys.insertar_gsc_registro(self._resumen_gsc())
 
             # Retornamos la información.
             return self.tools.output(200, "Actividad agregada con éxito.")
@@ -111,6 +167,9 @@ class OrdenesTrabajo:
                         "descripcion": descripcion,
                     }
                     self.querys.guardar_orden_trabajo(params)
+                    # Si el grupo es de servidores, registrar cada OT preventiva en GSC
+                    if str(grupo) == self.GRUPO_SERVIDORES:
+                        self.querys.insertar_gsc_registro(self._resumen_gsc())
 
             # Retornamos la información.
             return self.tools.output(200, "Órdenes de trabajo creadas con éxito.")
