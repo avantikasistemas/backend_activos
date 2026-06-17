@@ -513,7 +513,13 @@ class Querys:
             """
 
             if "codigo" in filtros and filtros["codigo"]:
-                sql += " AND ia.codigo LIKE :codigo"
+                sql += """ AND (
+                    ia.codigo LIKE :codigo
+                    OR ia.descripcion LIKE :codigo
+                    OR t.nombres LIKE :codigo
+                    OR ia.tercero LIKE :codigo
+                    OR ipm.nombre LIKE :codigo
+                )"""
                 self.query_params["codigo"] = f"%{filtros['codigo']}%"
 
             new_offset = self.obtener_limit(limit, position)
@@ -707,6 +713,51 @@ class Querys:
                 }
             )
             self.db.commit()
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Query para obtener el tercero responsable de un activo (para el correo de satisfacción)
+    def get_tercero_por_activo(self, activo_id: int):
+        """ Obtiene los datos del tercero al que pertenece un activo. """
+        try:
+            sql = """
+                SELECT t.nit, t.nombres, t.mail
+                FROM intranet_activos ia
+                INNER JOIN terceros t ON t.nit = ia.tercero
+                WHERE ia.id = :activo_id
+            """
+            result = self.db.execute(text(sql), {"activo_id": activo_id}).fetchone()
+            return dict(result._mapping) if result else None
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Query para registrar la respuesta de satisfacción de una OT
+    def actualizar_satisfaccion_ot(self, ot_id: int, respuesta: int):
+        """ Registra la respuesta de satisfacción (1 = Sí, 0 = No) sobre el mantenimiento.
+        Devuelve False si la OT ya tenía una respuesta registrada. """
+        try:
+            sql_check = """
+                SELECT satisfaccion FROM dbo.intranet_ordenes_trabajo
+                WHERE id = :ot_id AND estado = 1
+            """
+            result = self.db.execute(text(sql_check), {"ot_id": ot_id}).fetchone()
+            if not result:
+                raise CustomException("Orden de trabajo no encontrada.")
+            if result.satisfaccion is not None:
+                return False
+
+            sql = """
+                UPDATE dbo.intranet_ordenes_trabajo
+                SET satisfaccion = :respuesta
+                WHERE id = :ot_id AND estado = 1
+            """
+            self.db.execute(text(sql), {"respuesta": respuesta, "ot_id": ot_id})
+            self.db.commit()
+            return True
         except CustomException as e:
             raise CustomException(f"{e}")
         finally:

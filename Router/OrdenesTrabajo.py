@@ -40,3 +40,10 @@ def consultar_ordenes_trabajo(request: Request, db: Session = Depends(get_db)):
     data = getattr(request.state, "json_data", {})
     response = OrdenesTrabajo(db).consultar_ordenes_trabajo(data)
     return response
+
+@orden_trabajo_router.post('/responder_satisfaccion_ot', tags=["Ordenes de Trabajo"], response_model=dict)
+@http_decorator
+def responder_satisfaccion_ot(request: Request, db: Session = Depends(get_db)):
+    data = getattr(request.state, "json_data", {})
+    response = OrdenesTrabajo(db).responder_satisfaccion_ot(data)
+    return response

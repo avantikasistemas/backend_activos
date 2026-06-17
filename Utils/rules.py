@@ -15,6 +15,7 @@ class Rules:
             "/actualizar_activo": self.__val_actualizar_activo,
             "/responder_acta": self.__val_responder_acta,
             "/guardar_orden_trabajo": self.__val_guardar_orden_trabajo,
+            "/responder_satisfaccion_ot": self.__val_responder_satisfaccion_ot,
         }
         # Se obtiene la funcion a ejecutar
         func = path_dict.get(path, None)
@@ -334,5 +335,22 @@ class Rules:
                 "valor": params["descripcion"],
                 "obligatorio": True,
             }
+        ]
+        return validacion_dict
+
+    def __val_responder_satisfaccion_ot(self, params):
+        validacion_dict = [
+            {
+                "tipo": "int",
+                "campo": "ot_id",
+                "valor": params["ot_id"],
+                "obligatorio": True,
+            },
+            {
+                "tipo": "int",
+                "campo": "respuesta",
+                "valor": params["respuesta"],
+                "obligatorio": True,
+            },
         ]
         return validacion_dict
