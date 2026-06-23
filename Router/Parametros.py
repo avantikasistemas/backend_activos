@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request, Depends
 from sqlalchemy.orm import Session
 from Schemas.Params.macroproceso_x_grupo import MacroprocesoXgrupo
+from Schemas.Params.nuevo_tecnico import NuevoTecnico
 from Class.Parametros import Parametros
 from Utils.decorator import http_decorator
 from Config.db import get_db
@@ -67,6 +68,20 @@ def obtener_activos_x_grupo(request: Request, macro_x_grupo: MacroprocesoXgrupo,
 @http_decorator
 def obtener_tecnicos(request: Request, db: Session = Depends(get_db)):
     response = Parametros(db).obtener_tecnicos()
+    return response
+
+@parametros_router.post('/params/buscar_terceros', tags=["Parametros"], response_model=dict)
+@http_decorator
+def buscar_terceros(request: Request, db: Session = Depends(get_db)):
+    data = getattr(request.state, "json_data", {})
+    response = Parametros(db).buscar_terceros(data)
+    return response
+
+@parametros_router.post('/params/guardar_tecnico', tags=["Parametros"], response_model=dict)
+@http_decorator
+def guardar_tecnico(request: Request, db: Session = Depends(get_db)):
+    data = getattr(request.state, "json_data", {})
+    response = Parametros(db).guardar_tecnico(data)
     return response
 
 @parametros_router.post('/params/obtener_estados_ot', tags=["Parametros"], response_model=dict)

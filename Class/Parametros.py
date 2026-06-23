@@ -142,6 +142,34 @@ class Parametros:
         except CustomException as e:
             raise CustomException(f"{e}")
 
+    # Función para buscar terceros candidatos a técnico
+    def buscar_terceros(self, data):
+        """ Busca terceros filtrando por nombre o nit para el modal de agregar técnico. """
+
+        try:
+            busqueda = data.get("busqueda", "")
+            terceros = self.querys.buscar_terceros(busqueda)
+            return self.tools.output(200, "Datos encontrados.", terceros)
+
+        except CustomException as e:
+            raise CustomException(f"{e}")
+
+    # Función para guardar un nuevo técnico
+    def guardar_tecnico(self, data):
+        """ Guarda un nuevo técnico en intranet_activos_tecnicos vinculado por nit. """
+
+        try:
+            nit = data.get("nit")
+            nombre = data.get("nombre")
+            if not nit or not nombre:
+                raise CustomException("El NIT y el nombre son obligatorios.")
+
+            nuevo_id = self.querys.guardar_tecnico(nit, nombre)
+            return self.tools.output(200, "Técnico agregado correctamente.", {"id": nuevo_id, "nombre": nombre})
+
+        except CustomException as e:
+            raise CustomException(f"{e}")
+
     # Función para obtener los tecnicos asignados
     def obtener_estados_ot(self):
         """ Api que realiza la consulta de los estados de las ot. """

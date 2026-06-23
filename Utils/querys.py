@@ -557,6 +557,52 @@ class Querys:
         except CustomException as e:
             raise CustomException(f"{e}")
 
+    # Query para buscar terceros candidatos a técnico (búsqueda dinámica)
+    def buscar_terceros(self, busqueda: str):
+        """ Busca terceros (concepto_1 in 1,2,3,4, no bloqueados) filtrando por nombre o nit. """
+        try:
+            sql = """
+            SELECT TOP 30 nit, nombres
+            FROM terceros
+            WHERE concepto_1 IN (1, 2, 3, 4)
+              AND bloqueo = 0
+              AND (nombres LIKE :busqueda OR CAST(nit AS VARCHAR) LIKE :busqueda)
+            ORDER BY nombres ASC
+            """
+            result = self.db.execute(text(sql), {"busqueda": f"%{busqueda}%"}).fetchall()
+            return [dict(row._mapping) for row in result] if result else []
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Query para guardar un nuevo técnico en intranet_activos_tecnicos
+    def guardar_tecnico(self, nit: str, nombre: str):
+        """ Inserta un nuevo técnico vinculado a un tercero por NIT. """
+        try:
+            # Validar que el nit no esté ya registrado como técnico activo
+            sql_check = """
+            SELECT id FROM dbo.intranet_activos_tecnicos
+            WHERE nit = :nit AND estado = 1
+            """
+            existente = self.db.execute(text(sql_check), {"nit": nit}).fetchone()
+            if existente:
+                raise CustomException("Este técnico ya se encuentra registrado.")
+
+            sql = """
+            INSERT INTO dbo.intranet_activos_tecnicos (nombre, nit)
+            OUTPUT INSERTED.id
+            VALUES (:nombre, :nit)
+            """
+            result = self.db.execute(text(sql), {"nombre": nombre, "nit": nit})
+            inserted_id = result.scalar()
+            self.db.commit()
+            return inserted_id
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
     # Query para guardar una orden de trabajo
     def guardar_orden_trabajo(self, data: dict):
         try:
@@ -589,7 +635,7 @@ class Querys:
             self.db.close()
 
     # Query para obtener el historia de ordenes de trabajo
-    def get_historial_ot(self, activo_id: int):
+    def get_historial_ot(self, activo_id: int, fecha_desde: str = None, fecha_hasta: str = None):
         """ Api que realiza la consulta del historial de las ordenes de trabajo. """
 
         try:
@@ -602,9 +648,21 @@ class Querys:
                 INNER JOIN intranet_estados_ordenes_trabajo ieot ON ieot.id = iot.estado_ot
                 WHERE iot.activo_id = :activo_id
                 AND iot.estado = 1
-                ORDER BY iot.fecha_programacion_desde ASC
             """
-            result = self.db.execute(text(sql), {"activo_id": activo_id}).fetchall()
+            
+            params = {"activo_id": activo_id}
+
+            if fecha_desde:
+                sql += " AND iot.fecha_programacion_desde >= :fecha_desde"
+                params["fecha_desde"] = fecha_desde
+
+            if fecha_hasta:
+                sql += " AND iot.fecha_programacion_desde <= :fecha_hasta"
+                params["fecha_hasta"] = fecha_hasta
+
+            sql += " ORDER BY iot.fecha_programacion_desde ASC"
+
+            result = self.db.execute(text(sql), params).fetchall()
             data_list = [dict(row._mapping) for row in result] if result else []
             if data_list:
                 for row in data_list:
@@ -765,12 +823,15 @@ class Querys:
 
     # Query para consultar las ordenes de trabajo
     def consultar_ordenes_trabajo(self, data: dict):
-        """ Api que realiza la consulta de las ordenes de trabajo. """
+        """ Api que realiza la consulta de las ordenes de trabajo, con filtro opcional de fechas. """
 
         try:
             cant_registros = 0
             limit = data["limit"]
             position = data["position"]
+            fecha_desde = data.get("fecha_desde")
+            fecha_hasta = data.get("fecha_hasta")
+            codigo = data.get("codigo")
 
             sql = """                
                 select iot.*, ia.descripcion as descripcion_activo, iat.nombre as tecnico, ieot.nombre as estado_ot_nombre,
@@ -782,6 +843,18 @@ class Querys:
                 INNER JOIN intranet_estados_ordenes_trabajo ieot ON ieot.id = iot.estado_ot
                 where iot.estado = 1 AND ieot.id IN (1,2)
             """
+
+            if fecha_desde:
+                sql += " AND iot.fecha_programacion_desde >= :fecha_desde"
+                self.query_params["fecha_desde"] = fecha_desde
+
+            if fecha_hasta:
+                sql += " AND iot.fecha_programacion_desde <= :fecha_hasta"
+                self.query_params["fecha_hasta"] = fecha_hasta
+
+            if codigo:
+                sql += " AND ia.codigo LIKE :codigo"
+                self.query_params["codigo"] = f"%{codigo}%"
 
             new_offset = self.obtener_limit(limit, position)
             self.query_params.update({"offset": new_offset, "limit": limit})

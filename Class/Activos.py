@@ -61,13 +61,15 @@ class Activos:
 
         # Asignamos nuestros datos de entrada a sus respectivas variables
         codigo = data["codigo"]
+        fecha_desde = data.get("fecha_desde")
+        fecha_hasta = data.get("fecha_hasta")
 
         try:
             # Consultamos el activo en la base de datos
             data_activo = self.querys.get_activo(codigo)
             
             # Consultamos historial de ot si tiene
-            historial_ot = self.querys.get_historial_ot(data_activo["id"])
+            historial_ot = self.querys.get_historial_ot(data_activo["id"], fecha_desde, fecha_hasta)
             
             response = {
                 "data_activo": data_activo,
@@ -389,8 +391,13 @@ class Activos:
             # Obtenemos el nombre del tercero
             tercero_nombre = payload_general['payload']['cabecera']['nombres']
 
+            # Construimos la URL de la firma del usuario (que es el mismo link para ver el acta firmada)
+            base_url = os.getenv("FRONTEND_BASE_URL")
+            path = f"/activo/firmar/tercero/{pdf_generado_id}"
+            link = urljoin(base_url.rstrip('/')+'/', path.lstrip('/'))
+
             # Enviamos el correo de respuesta
-            body_correo = self.build_correo_respuesta(tercero_nombre)
+            body_correo = self.build_correo_respuesta(tercero_nombre, link)
 
             # Consultamos la información del tercero
             data_tercero = self.querys.check_tercero(tercero)
@@ -510,7 +517,7 @@ class Activos:
             raise CustomException(f"{e}")
 
     # Función para construir el correo de respuesta
-    def build_correo_respuesta(self, tercero_nombre: str):
+    def build_correo_respuesta(self, tercero_nombre: str, link: str):
         """ Función que construye el cuerpo del correo de respuesta. """
 
         body = f"""\
@@ -525,6 +532,7 @@ class Activos:
                 <body style="margin:0;padding:0;background:#f4f6f8;">
                     <h4>Buen día le notificamos que el/la usuario/a: {tercero_nombre}</h4>
                     <p>Ha realizado el proceso de firma del acta de activos de manera exitosa.</p>
+                    <strong><p><a href="{link}">Ver Acta de Activos Firmada</a></p></strong>
                 </body>
             </html>
         """

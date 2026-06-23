@@ -396,7 +396,7 @@ class Tools:
         
         pdf.setFont('Helvetica-Bold', 11)
         pdf.setFillColorRGB(0.31, 0.51, 0.75)  # #4f81bf
-        pdf.drawString(35, height - 72, "3. OSERVACIONES")
+        pdf.drawString(35, height - 72, "3. OBSERVACIONES")
         pdf.setFillColorRGB(0, 0, 0)  # Restaurar color negro
 
         # Observaciones (AJUSTE: wrap al ancho de la página)
