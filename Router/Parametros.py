@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Request, Depends
 from sqlalchemy.orm import Session
 from Schemas.Params.macroproceso_x_grupo import MacroprocesoXgrupo
-from Schemas.Params.nuevo_tecnico import NuevoTecnico
 from Class.Parametros import Parametros
 from Utils.decorator import http_decorator
 from Config.db import get_db
