@@ -982,6 +982,242 @@ class Querys:
         except Exception:
             return None
 
+    # ── Control de Actas ──────────────────────────────────────────────────────
+
+    # Lista todos los terceros (concepto_1 = 4, no bloqueados) cruzados con
+    # si tienen acta activa, para la pantalla de selección de la auditoría.
+    def ca_terceros_con_acta(self):
+        try:
+            sql = """
+                SELECT
+                t.nit,
+                t.nombres,
+                p.id        AS acta_id,
+                p.link_pdf  AS acta_link,
+                CASE WHEN p.id IS NOT NULL THEN 1 ELSE 0 END AS tiene_acta
+            FROM terceros t
+            LEFT JOIN (
+                SELECT tercero, MAX(id) AS id
+                FROM dbo.intranet_activos_pdfs_generados
+                WHERE estado = 1 AND firmado_creador = 1 AND firmado_tercero = 1
+                GROUP BY tercero
+            ) ultima ON ultima.tercero = t.nit
+            LEFT JOIN dbo.intranet_activos_pdfs_generados p
+                ON p.id = ultima.id
+            WHERE t.concepto_1 = 4 AND t.bloqueo = 0 AND p.id IS NOT NULL
+            ORDER BY t.nombres ASC
+            """
+            result = self.db.execute(text(sql)).fetchall()
+            return [dict(row._mapping) for row in result] if result else []
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Lista de auditorías guardadas (para la pantalla principal)
+    def ca_listar(self):
+        try:
+            sql = """
+                SELECT
+                    ca.id, ca.anio, ca.trimestre, ca.fecha_creacion,
+                    COUNT(d.id)                                              AS total_seleccionados,
+                    SUM(CASE WHEN d.coincide IS NOT NULL THEN 1 ELSE 0 END) AS total_revisados,
+                    SUM(CASE WHEN d.coincide = 1          THEN 1 ELSE 0 END) AS coinciden
+                FROM dbo.intranet_control_actas ca
+                LEFT JOIN dbo.intranet_control_actas_detalle d ON d.control_id = ca.id
+                WHERE ca.estado = 1
+                GROUP BY ca.id, ca.anio, ca.trimestre, ca.fecha_creacion
+                ORDER BY ca.fecha_creacion DESC
+            """
+            result = self.db.execute(text(sql)).fetchall()
+            data = [dict(row._mapping) for row in result] if result else []
+            for row in data:
+                for k, v in row.items():
+                    if isinstance(v, datetime):
+                        row[k] = v.strftime('%Y-%m-%d %H:%M:%S')
+            return data
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Crea la cabecera de una nueva auditoría y sus detalles de selección
+    def ca_guardar(self, anio: int, trimestre: int, seleccionados: list):
+        try:
+            sql_check = """
+                SELECT COUNT(*) AS total FROM dbo.intranet_control_actas
+                WHERE anio = :anio AND trimestre = :trimestre AND estado = 1
+            """
+            existe = self.db.execute(text(sql_check), {"anio": anio, "trimestre": trimestre}).scalar()
+            if existe:
+                raise CustomException(f"Ya existe una auditoría para T{trimestre} de {anio}.")
+
+            sql_cab = """
+                INSERT INTO dbo.intranet_control_actas (anio, trimestre)
+                OUTPUT INSERTED.id
+                VALUES (:anio, :trimestre)
+            """
+            control_id = self.db.execute(text(sql_cab), {"anio": anio, "trimestre": trimestre}).scalar()
+
+            sql_det = """
+                INSERT INTO dbo.intranet_control_actas_detalle
+                    (control_id, tercero_nit, tiene_acta, acta_id)
+                VALUES (:control_id, :tercero_nit, :tiene_acta, :acta_id)
+            """
+            for s in seleccionados:
+                self.db.execute(text(sql_det), {
+                    "control_id": control_id,
+                    "tercero_nit": s["nit"],
+                    "tiene_acta": 1 if s.get("acta_id") else 0,
+                    "acta_id": s.get("acta_id"),
+                })
+            self.db.commit()
+            return control_id
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Detalle de una auditoría con la info de cada tercero seleccionado
+    def ca_detalle(self, control_id: int):
+        try:
+            sql_cab = """
+                SELECT * FROM dbo.intranet_control_actas
+                WHERE id = :control_id AND estado = 1
+            """
+            cab = self.db.execute(text(sql_cab), {"control_id": control_id}).fetchone()
+            if not cab:
+                raise CustomException("Auditoría no encontrada.")
+            cab_dict = dict(cab._mapping)
+            for k, v in cab_dict.items():
+                if isinstance(v, datetime):
+                    cab_dict[k] = v.strftime('%Y-%m-%d %H:%M:%S')
+
+            sql_det = """
+                SELECT d.*, t.nombres AS tercero_nombre,
+                       p.link_pdf AS acta_link
+                FROM dbo.intranet_control_actas_detalle d
+                INNER JOIN terceros t ON t.nit = d.tercero_nit
+                LEFT JOIN dbo.intranet_activos_pdfs_generados p ON p.id = d.acta_id
+                WHERE d.control_id = :control_id
+                ORDER BY d.id ASC
+            """
+            rows = self.db.execute(text(sql_det), {"control_id": control_id}).fetchall()
+            detalles = [dict(r._mapping) for r in rows] if rows else []
+            for row in detalles:
+                for k, v in row.items():
+                    if isinstance(v, datetime):
+                        row[k] = v.strftime('%Y-%m-%d %H:%M:%S')
+            return {"cabecera": cab_dict, "detalles": detalles}
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Guarda la revisión (coincide + observación) de un detalle.
+    # Si no coincide, fija fecha_proxima_revision a +15 días automáticamente.
+    def ca_registrar_revision(self, detalle_id: int, coincide: int, observacion: str):
+        try:
+            sql = """
+                UPDATE dbo.intranet_control_actas_detalle
+                SET coincide               = :coincide,
+                    observacion            = :observacion,
+                    fecha_revision         = GETDATE(),
+                    fecha_proxima_revision = CASE WHEN :coincide = 0
+                                                THEN DATEADD(day, 15, GETDATE())
+                                                ELSE NULL END
+                WHERE id = :detalle_id
+            """
+            result = self.db.execute(text(sql), {
+                "coincide": coincide,
+                "observacion": observacion,
+                "detalle_id": detalle_id,
+            })
+            if result.rowcount == 0:
+                raise CustomException("Detalle no encontrado.")
+            self.db.commit()
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Historial completo de revisiones de un tercero (auditorías + seguimientos)
+    def ca_historial_tercero(self, tercero_nit: str):
+        try:
+            sql = """
+                SELECT
+                    'Auditoría' AS origen,
+                    ca.anio, ca.trimestre,
+                    d.coincide, d.observacion,
+                    d.fecha_revision,
+                    d.fecha_proxima_revision,
+                    d.id AS detalle_id
+                FROM dbo.intranet_control_actas_detalle d
+                INNER JOIN dbo.intranet_control_actas ca ON ca.id = d.control_id
+                WHERE d.tercero_nit = :nit AND d.coincide IS NOT NULL
+
+                UNION ALL
+
+                SELECT
+                    'Seguimiento' AS origen,
+                    NULL AS anio, NULL AS trimestre,
+                    s.coincide, s.observacion,
+                    s.fecha_revision,
+                    NULL AS fecha_proxima_revision,
+                    s.detalle_id
+                FROM dbo.intranet_control_actas_seguimiento s
+                WHERE s.tercero_nit = :nit
+
+                ORDER BY fecha_revision DESC
+            """
+            result = self.db.execute(text(sql), {"nit": tercero_nit}).fetchall()
+            data = [dict(row._mapping) for row in result] if result else []
+            for row in data:
+                for k, v in row.items():
+                    if isinstance(v, datetime):
+                        row[k] = v.strftime('%Y-%m-%d %H:%M:%S')
+            return data
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
+    # Guarda un seguimiento (revisión fuera del ciclo trimestral) de un tercero
+    def ca_guardar_seguimiento(self, detalle_id: int, tercero_nit: str, coincide: int, observacion: str):
+        try:
+            sql_ins = """
+                INSERT INTO dbo.intranet_control_actas_seguimiento
+                    (detalle_id, tercero_nit, coincide, observacion)
+                VALUES (:detalle_id, :tercero_nit, :coincide, :observacion)
+            """
+            self.db.execute(text(sql_ins), {
+                "detalle_id": detalle_id,
+                "tercero_nit": tercero_nit,
+                "coincide": coincide,
+                "observacion": observacion,
+            })
+            # Actualiza el detalle principal con el resultado del seguimiento
+            sql_upd = """
+                UPDATE dbo.intranet_control_actas_detalle
+                SET coincide               = :coincide,
+                    observacion            = :observacion,
+                    fecha_revision         = GETDATE(),
+                    fecha_proxima_revision = CASE WHEN :coincide = 0
+                                                THEN DATEADD(day, 15, GETDATE())
+                                                ELSE NULL END
+                WHERE id = :detalle_id
+            """
+            self.db.execute(text(sql_upd), {
+                "coincide": coincide,
+                "observacion": observacion,
+                "detalle_id": detalle_id,
+            })
+            self.db.commit()
+        except CustomException as e:
+            raise CustomException(f"{e}")
+        finally:
+            self.db.close()
+
     # Query para insertar un registro en Gestión TIC GSC
     def insertar_gsc_registro(self, resumen: str):
         try:

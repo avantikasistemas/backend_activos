@@ -6,6 +6,7 @@ from Middleware.get_json import JSONMiddleware
 from Router.Activos import activos_router
 from Router.Parametros import parametros_router
 from Router.OrdenesTrabajo import orden_trabajo_router
+from Router.ControlActas import control_actas_router
 from pathlib import Path
 
 route = Path.cwd()
@@ -27,6 +28,7 @@ app.add_middleware(
 app.include_router(activos_router)
 app.include_router(parametros_router)
 app.include_router(orden_trabajo_router)
+app.include_router(control_actas_router)
 
 BASE.metadata.create_all(bind=engine)
 
