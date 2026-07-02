@@ -1116,9 +1116,19 @@ class Querys:
 
     # Guarda la revisión (coincide + observación) de un detalle.
     # Si no coincide, fija fecha_proxima_revision a +15 días automáticamente.
+    # También inserta en seguimiento para que quede en el historial.
     def ca_registrar_revision(self, detalle_id: int, coincide: int, observacion: str):
         try:
-            sql = """
+            # Obtener tercero_nit para insertar en seguimiento
+            row = self.db.execute(
+                text("SELECT tercero_nit FROM dbo.intranet_control_actas_detalle WHERE id = :id"),
+                {"id": detalle_id}
+            ).fetchone()
+            if not row:
+                raise CustomException("Detalle no encontrado.")
+            tercero_nit = row[0]
+
+            sql_upd = """
                 UPDATE dbo.intranet_control_actas_detalle
                 SET coincide               = :coincide,
                     observacion            = :observacion,
@@ -1128,13 +1138,23 @@ class Querys:
                                                 ELSE NULL END
                 WHERE id = :detalle_id
             """
-            result = self.db.execute(text(sql), {
+            self.db.execute(text(sql_upd), {
                 "coincide": coincide,
                 "observacion": observacion,
                 "detalle_id": detalle_id,
             })
-            if result.rowcount == 0:
-                raise CustomException("Detalle no encontrado.")
+
+            sql_ins = """
+                INSERT INTO dbo.intranet_control_actas_seguimiento
+                    (detalle_id, tercero_nit, coincide, observacion)
+                VALUES (:detalle_id, :tercero_nit, :coincide, :observacion)
+            """
+            self.db.execute(text(sql_ins), {
+                "detalle_id": detalle_id,
+                "tercero_nit": tercero_nit,
+                "coincide": coincide,
+                "observacion": observacion,
+            })
             self.db.commit()
         except CustomException as e:
             raise CustomException(f"{e}")
